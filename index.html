@@ -26,6 +26,19 @@
     .glass { background: rgba(20,20,20,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
     .neon-btn { background: linear-gradient(90deg,#ff00de,#8b5cf6); box-shadow: 0 0 18px #8b5cf6; }
     .neon-btn:hover { box-shadow: 0 0 30px #ff00de; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeIn 1.2s ease forwards; }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0px #22c55e; }
+      50% { box-shadow: 0 0 25px #22c55e; }
+      100% { box-shadow: 0 0 0px #22c55e; }
+    }
+    .verified-badge { animation: pulseGlow 2s infinite; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-16">
@@ -37,8 +50,8 @@
   </div>
 
   <!-- Header -->
-  <header class="text-center mt-10 px-4">
-    <img src="cropped-fav.png" alt="School Logo" class="w-24 h-24 mx-auto mb-4" />
+  <header class="text-center mt-10 px-4 animate-fade-in">
+    <img src="cropped-fav.png" alt="School Logo" class="w-24 h-24 mx-auto mb-4 animate-pulse" />
     <h3 class="text-cyan-400 tracking-widest text-sm uppercase">Seth M.R. Jaipuria School, Shahjahanpur</h3>
     <h1 class="text-5xl font-black neon-text mt-3">Encore After Party</h1>
     <p class="text-gray-400 mt-2">Class of 2025–26 · One Last Night</p>
@@ -68,6 +81,66 @@
     <p class="text-pink-400 font-bold mt-2">Be There or Be Square</p>
   </section>
 
+  <!-- QR Verification -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
+    <div class="verified-badge w-20 h-20 mx-auto rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-3xl border border-green-500">
+      ✓
+    </div>
+    <h3 class="text-xl font-bold text-white mt-4">Valid Entry Pass</h3>
+    <p class="text-gray-400 text-sm mt-1">QR code verified successfully</p>
+  </section>
+
+  <!-- Countdown & Event Status -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
+    <h3 class="text-lg font-bold text-white mb-2">Event Status</h3>
+    <p id="event-status" class="text-cyan-400 font-semibold mb-3">Loading status…</p>
+    <div id="countdown" class="text-white text-xl font-bold"></div>
+  </section>
+
+  <!-- Venue Map -->
+  <section class="max-w-md w-full mt-6">
+    <a href="https://www.google.com/maps/search/?api=1&query=Saras+Elysium+The+Grand+Arc+Hotel+Shahjahanpur" target="_blank"
+       class="block text-center neon-btn text-white font-bold py-4 rounded-xl">
+      Navigate to Venue
+    </a>
+  </section>
+
+  <!-- Organizer Contact -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
+    <h3 class="text-white font-bold mb-3">Organizer Contact</h3>
+    <a href="https://wa.me/91XXXXXXXXXX" target="_blank"
+       class="inline-block bg-green-500 text-black font-bold px-6 py-3 rounded-xl">WhatsApp Organizer</a>
+  </section>
+
+  <!-- Dress Code -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl">
+    <h3 class="text-white font-bold mb-2">Dress Code</h3>
+    <p class="text-gray-300">Party Wear / Semi‑Formal. Dress classy and comfortable.</p>
+  </section>
+
+  <!-- Event Rules -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-sm text-gray-300">
+    <h3 class="text-white font-bold mb-2">Event Rules</h3>
+    <ul class="list-disc list-inside space-y-1">
+      <li>School ID mandatory for entry</li>
+      <li>No outside guests allowed</li>
+      <li>Entry subject to organizer approval</li>
+      <li>Follow school decorum at all times</li>
+    </ul>
+  </section>
+
+  <!-- Photo Upload & Gallery -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
+    <h3 class="text-white font-bold mb-3">Event Gallery</h3>
+    <p class="text-gray-400 text-sm mb-4">Share your moments and relive the memories</p>
+    <div class="space-y-3">
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSeobn7ilbAbY3cF0TZqCMM_v2pNNQ0zKR6gpTBYf43fV_9Z1w/viewform" target="_blank"
+         class="block neon-btn text-white font-bold py-3 rounded-xl">Upload Your Photos</a>
+      <a href="https://drive.google.com/drive/folders/1Ruer4kVgdHeoyXkXuaukYe8b4BRiQ7HGRYQv9JlBLqbmZO-SuxEwY8lwnuD9dPVzfmJogVEK" target="_blank"
+         class="block bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl">View Event Gallery</a>
+    </div>
+  </section>
+
   <!-- RSVP Disabled Note -->
   <section class="max-w-md w-full mt-6 p-5 border border-dashed border-gray-700 rounded-xl text-center text-gray-400 text-sm">
     RSVP system removed for free hosting reliability.<br />
@@ -79,5 +152,34 @@
     Heaven Eleven Productions · Jaipurians
   </footer>
 
+  <script>
+    const eventDate = new Date('February 1, 2026 17:00:00').getTime();
+    const statusEl = document.getElementById('event-status');
+    const countdownEl = document.getElementById('countdown');
+
+    function updateCountdown() {
+      const now = new Date().getTime();
+      const diff = eventDate - now;
+
+      if (diff > 0) {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((diff / (1000 * 60)) % 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+
+        statusEl.innerText = 'Event Starts In';
+        countdownEl.innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+      } else if (diff > -3 * 60 * 60 * 1000) {
+        statusEl.innerText = 'Now Admitting Guests';
+        countdownEl.innerText = 'Welcome to Encore After Party';
+      } else {
+        statusEl.innerText = 'Event Concluded';
+        countdownEl.innerText = 'Thank you for being part of Class of 2025–26';
+      }
+    }
+
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+  </script>
 </body>
 </html>
