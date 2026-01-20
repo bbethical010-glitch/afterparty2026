@@ -32,15 +32,9 @@
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in { animation: fadeIn 1.2s ease forwards; }
-
-    @keyframes pulseGlow {
-      0% { box-shadow: 0 0 0px #22c55e; }
-      50% { box-shadow: 0 0 25px #22c55e; }
-      100% { box-shadow: 0 0 0px #22c55e; }
-    }
-    .verified-badge { animation: pulseGlow 2s infinite; }
   </style>
 </head>
+
 <body class="min-h-screen flex flex-col items-center pb-16">
 
   <!-- Background Glow -->
@@ -59,47 +53,51 @@
 
   <!-- Event Card -->
   <section class="glass max-w-md w-full mt-10 p-6 rounded-2xl space-y-4">
-    <div class="flex gap-4 items-start">
+    <div class="flex gap-4">
       <i class="fas fa-calendar text-pink-500 text-xl"></i>
       <div>
         <p class="text-sm text-gray-400">Date & Time</p>
         <p class="text-lg font-bold">1 February 2026 · 5:00 PM Sharp</p>
       </div>
     </div>
-    <div class="flex gap-4 items-start">
+    <div class="flex gap-4">
       <i class="fas fa-map-marker-alt text-cyan-400 text-xl"></i>
       <div>
         <p class="text-sm text-gray-400">Venue</p>
-        <p class="text-lg font-bold">Saras Elysium, 2nd Floor<br/>The Grand Arc Hotel & Convention Centre</p>
+        <p class="text-lg font-bold">Saras Elysium, 2nd Floor<br>The Grand Arc Hotel & Convention Centre</p>
       </div>
     </div>
   </section>
 
-  <!-- Info Section -->
+  <!-- Entry Verification System -->
+  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
+    <h3 class="text-xl font-bold text-white mb-2">Entry Verification</h3>
+    <p class="text-gray-400 text-sm mb-4">Organizer use only · One-time entry</p>
+
+    <input id="entryIdInput"
+      type="text"
+      placeholder="Enter Entry ID (e.g. JAI-012)"
+      class="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 text-white text-center text-lg uppercase focus:outline-none focus:border-pink-500">
+
+    <button id="verifyBtn"
+      class="w-full mt-4 neon-btn text-white font-bold py-3 rounded-xl">
+      VERIFY ENTRY
+    </button>
+
+    <div id="verifyResult" class="mt-5 text-xl font-bold"></div>
+  </section>
+
+  <!-- Countdown -->
   <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
-    <p class="text-gray-300">Dinner · Live Music · Dance Floor</p>
-    <p class="text-pink-400 font-bold mt-2">Be There or Be Square</p>
-  </section>
-
-  <!-- QR Verification -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
-    <div class="verified-badge w-20 h-20 mx-auto rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-3xl border border-green-500">
-      ✓
-    </div>
-    <h3 class="text-xl font-bold text-white mt-4">Valid Entry Pass</h3>
-    <p class="text-gray-400 text-sm mt-1">QR code verified successfully</p>
-  </section>
-
-  <!-- Countdown & Event Status -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
     <h3 class="text-lg font-bold text-white mb-2">Event Status</h3>
-    <p id="event-status" class="text-cyan-400 font-semibold mb-3">Loading status…</p>
+    <p id="event-status" class="text-cyan-400 font-semibold mb-3">Loading…</p>
     <div id="countdown" class="text-white text-xl font-bold"></div>
   </section>
 
   <!-- Venue Map -->
   <section class="max-w-md w-full mt-6">
-    <a href="https://www.google.com/maps/search/?api=1&query=Saras+Elysium+The+Grand+Arc+Hotel+Shahjahanpur" target="_blank"
+    <a href="https://www.google.com/maps/search/?api=1&query=Saras+Elysium+The+Grand+Arc+Hotel+Shahjahanpur"
+       target="_blank"
        class="block text-center neon-btn text-white font-bold py-4 rounded-xl">
       Navigate to Venue
     </a>
@@ -109,83 +107,110 @@
   <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
     <h3 class="text-white font-bold mb-3">Organizer Contact</h3>
     <a href="https://wa.me/917007520015" target="_blank"
-       class="inline-block bg-green-500 text-black font-bold px-6 py-3 rounded-xl">WhatsApp Organizer</a>
-  </section>
-
-  <!-- Dress Code -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl">
-    <h3 class="text-white font-bold mb-2">Dress Code</h3>
-    <p class="text-gray-300">Party Wear / Semi‑Formal. Dress classy and comfortable.</p>
+       class="inline-block bg-green-500 text-black font-bold px-6 py-3 rounded-xl">
+      WhatsApp Organizer
+    </a>
   </section>
 
   <!-- Event Rules -->
   <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-sm text-gray-300">
     <h3 class="text-white font-bold mb-2">Event Rules</h3>
     <ul class="list-disc list-inside space-y-1">
-      <li>🎟️ QR = Entry — scan at the gate, no QR no entry</li>
-      <li>🔒 Invite-only scene — no outside guests</li>
-      <li>⏰ Be on time — late entry may be denied</li>
-      <li>👗🕺 Dress to impress — party wear / semi-formal only</li>
-      <li>🏨 Respect the venue — let’s keep it classy</li>
-      <li>😎 Good vibes only — no drama or misbehaviour</li>
-      <li>🚫 Outside food, drinks or shady stuff not allowed</li>
-      <li>🎧 Organizer’s call is final — no arguments</li>
-      <li>📸 Cameras will be around — smile!</li>
-      <li>🔥 Party hard, party smart — make it legendary</li>
+      <li>🎟️ Entry only after verification</li>
+      <li>🔒 Invite-only event</li>
+      <li>👗 Party wear / semi-formal only</li>
+      <li>🏨 Respect the venue</li>
+      <li>😎 Good vibes only</li>
+      <li>🎧 Organizer’s decision is final</li>
     </ul>
   </section>
 
-  <!-- Photo Upload & Gallery -->
+  <!-- Gallery -->
   <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
     <h3 class="text-white font-bold mb-3">Event Gallery</h3>
-    <p class="text-gray-400 text-sm mb-4">Share your moments and relive the memories</p>
-    <div class="space-y-3">
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLSeobn7ilbAbY3cF0TZqCMM_v2pNNQ0zKR6gpTBYf43fV_9Z1w/viewform" target="_blank"
-         class="block neon-btn text-white font-bold py-3 rounded-xl">Upload Your Photos</a>
-      <a href="https://drive.google.com/drive/folders/1Ruer4kVgdHeoyXkXuaukYe8b4BRiQ7HGRYQv9JlBLqbmZO-SuxEwY8lwnuD9dPVzfmJogVEK" target="_blank"
-         class="block bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl">View Event Gallery</a>
-    </div>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeobn7ilbAbY3cF0TZqCMM_v2pNNQ0zKR6gpTBYf43fV_9Z1w/viewform"
+       target="_blank"
+       class="block neon-btn text-white font-bold py-3 rounded-xl mb-3">
+      Upload Photos
+    </a>
+    <a href="https://drive.google.com/drive/folders/1Ruer4kVgdHeoyXkXuaukYe8b4BRiQ7HGRYQv9JlBLqbmZO-SuxEwY8lwnuD9dPVzfmJogVEK"
+       target="_blank"
+       class="block bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl">
+      View Gallery
+    </a>
   </section>
 
-  <!-- RSVP Disabled Note -->
-  <section class="max-w-md w-full mt-6 p-5 border border-dashed border-gray-700 rounded-xl text-center text-gray-400 text-sm">
-    RSVP system removed for free hosting reliability.<br />
-    Share this link and poster for entry details.
-  </section>
-
-  <!-- Footer -->
-  <footer class="mt-12 text-center text-xs text-gray-600">
-    Heaven Eleven Productions · Jaipurians
-  </footer>
-
+  <!-- Countdown Script -->
   <script>
     const eventDate = new Date('February 1, 2026 17:00:00').getTime();
     const statusEl = document.getElementById('event-status');
     const countdownEl = document.getElementById('countdown');
 
-    function updateCountdown() {
+    setInterval(() => {
       const now = new Date().getTime();
       const diff = eventDate - now;
-
       if (diff > 0) {
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((diff / (1000 * 60)) % 60);
-        const seconds = Math.floor((diff / 1000) % 60);
-
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor(diff / 3600000) % 24;
+        const m = Math.floor(diff / 60000) % 60;
+        const s = Math.floor(diff / 1000) % 60;
         statusEl.innerText = 'Event Starts In';
-        countdownEl.innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-      } else if (diff > -3 * 60 * 60 * 1000) {
-        statusEl.innerText = 'Now Admitting Guests';
-        countdownEl.innerText = 'Welcome to Encore After Party';
+        countdownEl.innerText = `${d}d ${h}h ${m}m ${s}s`;
       } else {
-        statusEl.innerText = 'Event Concluded';
-        countdownEl.innerText = 'Thank you for being part of Class of 2025–26';
+        statusEl.innerText = 'Event Ongoing / Concluded';
+        countdownEl.innerText = 'Welcome to Encore';
       }
-    }
-
-    setInterval(updateCountdown, 1000);
-    updateCountdown();
+    }, 1000);
   </script>
+
+  <!-- FIREBASE ENTRY VERIFICATION -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBoMIeT_axIVSyyhBC8PRzcO9z0bhIIyXA",
+      authDomain: "encore-entry-system.firebaseapp.com",
+      projectId: "encore-entry-system"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const input = document.getElementById("entryIdInput");
+    const btn = document.getElementById("verifyBtn");
+    const result = document.getElementById("verifyResult");
+
+    btn.onclick = async () => {
+      const id = input.value.trim().toUpperCase();
+      if (!id) return;
+
+      btn.disabled = true;
+      result.textContent = "Checking…";
+
+      const ref = doc(db, "guest_list", id);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        result.textContent = "❌ ID NOT FOUND";
+        result.className = "text-red-500";
+      } else if (snap.data().checkedIn) {
+        result.textContent = "🚫 ALREADY USED";
+        result.className = "text-red-500";
+      } else {
+        await updateDoc(ref, {
+          checkedIn: true,
+          checkedInAt: serverTimestamp()
+        });
+        result.textContent = "✅ ENTRY APPROVED";
+        result.className = "text-green-400 text-2xl";
+      }
+
+      btn.disabled = false;
+      input.value = "";
+    };
+  </script>
+
 </body>
 </html>
