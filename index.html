@@ -1,203 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Seth M.R. Jaipuria School – Class 12 Farewell After Party</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Encore After Party – Entry System</title>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-
-  <style>
-    body {
-      font-family: 'Rajdhani', sans-serif;
-      background-color: #050505;
-      color: #e5e7eb;
-      overflow-x: hidden;
-    }
-    h1, h2, h3 { font-family: 'Orbitron', sans-serif; }
-    .neon-text { text-shadow: 0 0 6px #ff00de, 0 0 18px #ff00de; }
-    .glass { background: rgba(20,20,20,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-    .neon-btn { background: linear-gradient(90deg,#ff00de,#8b5cf6); box-shadow: 0 0 18px #8b5cf6; }
-    .neon-btn:hover { box-shadow: 0 0 30px #ff00de; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in { animation: fadeIn 1.2s ease forwards; }
-  </style>
+<style>
+body {
+  font-family: 'Rajdhani', sans-serif;
+  background: url("https://www.thegrandarc.com/images/grand-banner.jpg") center/cover no-repeat fixed;
+}
+.overlay {
+  background: rgba(0,0,0,0.85);
+  min-height: 100vh;
+}
+h1,h2,h3 { font-family: 'Orbitron', sans-serif; }
+</style>
 </head>
 
-<body class="min-h-screen flex flex-col items-center pb-16">
-
-  <!-- Background Glow -->
-  <div class="fixed inset-0 -z-10">
-    <div class="absolute -top-32 -left-32 w-96 h-96 bg-purple-800 rounded-full blur-[140px] opacity-30"></div>
-    <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-800 rounded-full blur-[140px] opacity-30"></div>
-  </div>
-
-  <!-- Header -->
-  <header class="text-center mt-10 px-4 animate-fade-in">
-    <img src="cropped-fav.png" alt="School Logo" class="w-24 h-24 mx-auto mb-4 animate-pulse" />
-    <h3 class="text-cyan-400 tracking-widest text-sm uppercase">Seth M.R. Jaipuria School, Shahjahanpur</h3>
-    <h1 class="text-5xl font-black neon-text mt-3">Encore After Party</h1>
-    <p class="text-gray-400 mt-2">Class of 2025–26 · One Last Night</p>
-  </header>
-
-  <!-- Event Card -->
-  <section class="glass max-w-md w-full mt-10 p-6 rounded-2xl space-y-4">
-    <div class="flex gap-4">
-      <i class="fas fa-calendar text-pink-500 text-xl"></i>
-      <div>
-        <p class="text-sm text-gray-400">Date & Time</p>
-        <p class="text-lg font-bold">1 February 2026 · 5:00 PM Sharp</p>
-      </div>
-    </div>
-    <div class="flex gap-4">
-      <i class="fas fa-map-marker-alt text-cyan-400 text-xl"></i>
-      <div>
-        <p class="text-sm text-gray-400">Venue</p>
-        <p class="text-lg font-bold">Saras Elysium, 2nd Floor<br>The Grand Arc Hotel & Convention Centre</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Entry Verification System -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center animate-fade-in">
-    <h3 class="text-xl font-bold text-white mb-2">Entry Verification</h3>
-    <p class="text-gray-400 text-sm mb-4">Organizer use only · One-time entry</p>
-
-    <input id="entryIdInput"
-      type="text"
-      placeholder="Enter Entry ID"
-      class="w-full px-4 py-3 rounded-xl bg-black border border-gray-700 text-white text-center text-lg uppercase focus:outline-none focus:border-pink-500">
-
-    <button id="verifyBtn"
-      class="w-full mt-4 neon-btn text-white font-bold py-3 rounded-xl">
-      VERIFY ENTRY
+<body>
+<div id="passwordGate" class="overlay flex items-center justify-center">
+  <div class="bg-black p-6 rounded-xl border border-gray-700 text-center w-80">
+    <h2 class="text-white mb-4">Organizer Access</h2>
+    <input id="pw" type="password" placeholder="Enter password"
+      class="w-full p-3 rounded bg-gray-900 text-white mb-4">
+    <button onclick="unlock()" class="w-full bg-green-500 text-black font-bold py-2 rounded">
+      Unlock
     </button>
+  </div>
+</div>
 
-    <div id="verifyResult" class="mt-5 text-xl font-bold"></div>
-  </section>
+<div id="app" class="overlay hidden flex flex-col items-center p-6">
 
-  <!-- Countdown -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
-    <h3 class="text-lg font-bold text-white mb-2">Event Status</h3>
-    <p id="event-status" class="text-cyan-400 font-semibold mb-3">Loading…</p>
-    <div id="countdown" class="text-white text-xl font-bold"></div>
-  </section>
+<h1 class="text-white text-3xl mb-6">Encore Entry Verification</h1>
 
-  <!-- Venue Map -->
-  <section class="max-w-md w-full mt-6">
-    <a href="https://www.google.com/maps/search/?api=1&query=Saras+Elysium+The+Grand+Arc+Hotel+Shahjahanpur"
-       target="_blank"
-       class="block text-center neon-btn text-white font-bold py-4 rounded-xl">
-      Navigate to Venue
-    </a>
-  </section>
+<div class="bg-black p-6 rounded-xl w-full max-w-sm border border-gray-700">
+  <p class="text-gray-400 mb-3 text-sm">Organizer use only · Payment required</p>
 
-  <!-- Organizer Contact -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
-    <h3 class="text-white font-bold mb-3">Organizer Contact</h3>
-    <a href="https://wa.me/917007520015" target="_blank"
-       class="inline-block bg-green-500 text-black font-bold px-6 py-3 rounded-xl">
-      WhatsApp Organizer
-    </a>
-  </section>
+  <input id="entryId" placeholder="JAI-0XX"
+    class="w-full p-3 text-center text-lg uppercase rounded bg-gray-900 text-white mb-4">
 
-  <!-- Event Rules -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-sm text-gray-300">
-    <h3 class="text-white font-bold mb-2">Event Rules</h3>
-    <ul class="list-disc list-inside space-y-1">
-      <li>🎟️ Entry only after verification</li>
-      <li>🔒 Invite-only event</li>
-      <li>👗 Party wear / semi-formal only</li>
-      <li>🏨 Respect the venue</li>
-      <li>😎 Good vibes only</li>
-      <li>🎧 Organizer’s decision is final</li>
-    </ul>
-  </section>
+  <button id="verifyBtn"
+    class="w-full bg-pink-500 text-black font-bold py-3 rounded">
+    VERIFY ENTRY
+  </button>
 
-  <!-- Gallery -->
-  <section class="glass max-w-md w-full mt-6 p-6 rounded-2xl text-center">
-    <h3 class="text-white font-bold mb-3">Event Gallery</h3>
-    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeobn7ilbAbY3cF0TZqCMM_v2pNNQ0zKR6gpTBYf43fV_9Z1w/viewform"
-       target="_blank"
-       class="block neon-btn text-white font-bold py-3 rounded-xl mb-3">
-      Upload Photos
-    </a>
-    <a href="https://drive.google.com/drive/folders/1Ruer4kVgdHeoyXkXuaukYe8b4BRiQ7HGRYQv9JlBLqbmZO-SuxEwY8lwnuD9dPVzfmJogVEK"
-       target="_blank"
-       class="block bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl">
-      View Gallery
-    </a>
-  </section>
+  <div id="result" class="mt-4 text-xl font-bold text-center"></div>
+</div>
 
-  <!-- Countdown Script -->
-  <script>
-    const eventDate = new Date('February 1, 2026 17:00:00').getTime();
-    const statusEl = document.getElementById('event-status');
-    const countdownEl = document.getElementById('countdown');
+</div>
 
-    setInterval(() => {
-      const now = new Date().getTime();
-      const diff = eventDate - now;
-      if (diff > 0) {
-        const d = Math.floor(diff / 86400000);
-        const h = Math.floor(diff / 3600000) % 24;
-        const m = Math.floor(diff / 60000) % 60;
-        const s = Math.floor(diff / 1000) % 60;
-        statusEl.innerText = 'Event Starts In';
-        countdownEl.innerText = `${d}d ${h}h ${m}m ${s}s`;
-      } else {
-        statusEl.innerText = 'Event Ongoing / Concluded';
-        countdownEl.innerText = 'Welcome to Encore';
-      }
-    }, 1000);
-  </script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, updateDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  <!-- FIREBASE ENTRY VERIFICATION -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, getDoc, updateDoc, serverTimestamp }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+/* 🔴 REPLACE WITH YOUR CONFIG */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID"
+};
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBoMIeT_axIVSyyhBC8PRzcO9z0bhIIyXA",
-      authDomain: "encore-entry-system.firebaseapp.com",
-      projectId: "encore-entry-system"
-    };
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+const btn = document.getElementById("verifyBtn");
+const result = document.getElementById("result");
 
-    const input = document.getElementById("entryIdInput");
-    const btn = document.getElementById("verifyBtn");
-    const result = document.getElementById("verifyResult");
+btn.onclick = async () => {
+  const id = document.getElementById("entryId").value.trim().toUpperCase();
+  if (!id) return;
 
-    btn.onclick = async () => {
-      const id = input.value.trim().toUpperCase();
-      if (!id) return;
+  btn.disabled = true;
+  result.textContent = "Checking…";
+  result.className = "text-yellow-400";
 
-      btn.disabled = true;
-      result.textContent = "Checking…";
+  try {
+    const ref = doc(db, "guest_list", id);
+    const snap = await getDoc(ref);
 
-      const ref = doc(db, "guest_list", id);
-      const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      result.textContent = "❌ ID NOT FOUND";
+      result.className = "text-red-500";
+    } else {
+      const data = snap.data();
 
-      if (!snap.exists()) {
-        result.textContent = "❌ ID NOT FOUND";
-        result.className = "text-red-500";
-      } else if (snap.data().checkedIn) {
+      if (data.checkedIn) {
         result.textContent = "🚫 ALREADY USED";
         result.className = "text-red-500";
+      } else if (!data.paid) {
+        result.textContent = "💰 PAYMENT PENDING";
+        result.className = "text-orange-400";
       } else {
         await updateDoc(ref, {
           checkedIn: true,
@@ -206,11 +104,29 @@
         result.textContent = "✅ ENTRY APPROVED";
         result.className = "text-green-400 text-2xl";
       }
+    }
+  } catch (e) {
+    result.textContent = "⚠️ SYSTEM ERROR";
+    result.className = "text-red-400";
+  }
 
-      btn.disabled = false;
-      input.value = "";
-    };
-  </script>
+  btn.disabled = false;
+  document.getElementById("entryId").value = "";
+};
+</script>
+
+<script>
+const PASSWORD = "encore2026"; // change this
+
+function unlock() {
+  if (document.getElementById("pw").value === PASSWORD) {
+    document.getElementById("passwordGate").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+  } else {
+    alert("Wrong password");
+  }
+}
+</script>
 
 </body>
 </html>
