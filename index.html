@@ -80,7 +80,7 @@ import {
   getFirestore, doc, getDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* 🔴 REPLACE CONFIG */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyBoMIeT_axIVSyyhBC8PRzcO9z0bhIIyXA",
   authDomain: "encore-entry-system.firebaseapp.com",
@@ -90,11 +90,26 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let currentRef, currentData;
+let currentRef = null;
+let currentData = null;
+
+// DOM references
+const card = document.getElementById("card");
+const nameEl = document.getElementById("name");
+const gidEl = document.getElementById("gid");
+const paidEl = document.getElementById("paid");
+const usedEl = document.getElementById("used");
+const msgEl = document.getElementById("msg");
+const verifyBtn = document.getElementById("verify");
 
 document.getElementById("fetchBtn").onclick = async () => {
   const id = entryId.value.trim().toUpperCase();
   if (!id) return;
+
+  // Reset UI
+  card.classList.add("hidden");
+  msgEl.innerText = "";
+  verifyBtn.disabled = false;
 
   const ref = doc(db, "guest_list", id);
   const snap = await getDoc(ref);
@@ -107,39 +122,66 @@ document.getElementById("fetchBtn").onclick = async () => {
   currentRef = ref;
   currentData = snap.data();
 
+  // Defensive defaults
+  const paid = !!currentData.paid;
+  const checkedIn = !!currentData.checkedIn;
+
   card.classList.remove("hidden");
-  name.innerText = currentData.name;
-  gid.innerText = id;
-  paid.innerText = currentData.paid ? "PAID" : "NOT PAID";
-  used.innerText = currentData.checkedIn ? "USED" : "NOT USED";
+  nameEl.innerText = currentData.name || "—";
+  gidEl.innerText = id;
+  paidEl.innerText = paid ? "PAID" : "NOT PAID";
+  paidEl.className = paid ? "text-green-400" : "text-yellow-400";
+  usedEl.innerText = checkedIn ? "USED" : "NOT USED";
+  usedEl.className = checkedIn ? "text-red-400" : "text-cyan-400";
+
+  if (checkedIn) {
+    msgEl.innerText = "Already Used";
+    msgEl.className = "text-red-400 text-lg";
+    verifyBtn.disabled = true;
+  }
 };
 
 togglePay.onclick = async () => {
-  await updateDoc(currentRef, { paid: !currentData.paid });
+  if (!currentRef) return;
+
   currentData.paid = !currentData.paid;
-  paid.innerText = currentData.paid ? "PAID" : "NOT PAID";
+  await updateDoc(currentRef, { paid: currentData.paid });
+
+  paidEl.innerText = currentData.paid ? "PAID" : "NOT PAID";
+  paidEl.className = currentData.paid ? "text-green-400" : "text-yellow-400";
+
+  msgEl.innerText = "Payment status updated";
+  msgEl.className = "text-cyan-400";
 };
 
 verify.onclick = async () => {
+  if (!currentRef) return;
+
   if (currentData.checkedIn) {
-    msg.innerText = "Already Used";
-    msg.className = "text-red-400";
+    msgEl.innerText = "Already Used";
+    msgEl.className = "text-red-400";
     return;
   }
+
   if (!currentData.paid) {
-    msg.innerText = "Payment Pending";
-    msg.className = "text-yellow-400";
+    msgEl.innerText = "Payment Pending";
+    msgEl.className = "text-yellow-400";
     return;
   }
+
   await updateDoc(currentRef, {
     checkedIn: true,
     checkedInAt: serverTimestamp()
   });
-  used.innerText = "USED";
-  msg.innerText = "ENTRY APPROVED";
-  msg.className = "text-green-400 text-xl";
-};
 
+  currentData.checkedIn = true;
+  usedEl.innerText = "USED";
+  usedEl.className = "text-red-400";
+  verifyBtn.disabled = true;
+
+  msgEl.innerText = "ENTRY APPROVED";
+  msgEl.className = "text-green-400 text-xl";
+};
 </script>
 
 <script>
@@ -148,7 +190,9 @@ function unlock() {
   if (pw.value === PASSWORD) {
     login.classList.add("hidden");
     hub.classList.remove("hidden");
-  } else alert("Wrong password");
+  } else {
+    alert("Wrong password");
+  }
 }
 </script>
 
