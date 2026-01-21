@@ -17,78 +17,76 @@ body {
   background: url("https://www.thegrandarc.com/images/grand-banner.jpg") center/cover no-repeat fixed;
 }
 .overlay {
-  background: linear-gradient(180deg, rgba(8,0,25,0.88), rgba(0,0,0,0.92));
+  background: linear-gradient(180deg, rgba(10,0,35,0.9), rgba(0,0,0,0.95));
   min-height: 100vh;
 }
 h1,h2,h3 { font-family: 'Orbitron', sans-serif; }
 .glass {
-  background: rgba(15,15,30,0.75);
-  backdrop-filter: blur(14px);
+  background: rgba(20,20,40,0.75);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,0.12);
 }
 </style>
 </head>
 
 <body>
+
+<!-- PASSWORD GATE -->
 <div id="passwordGate" class="overlay flex items-center justify-center">
   <div class="glass p-6 rounded-xl text-center w-80">
+    <img src="cropped-fav.png" class="w-20 mx-auto mb-4">
     <h2 class="text-white mb-4">Enter Access Code</h2>
     <input id="pw" type="password" placeholder="ENCORE2026"
-      class="w-full p-3 rounded bg-black text-white mb-4">
+      class="w-full p-3 rounded bg-black text-white mb-4 text-center">
     <button onclick="unlock()" class="w-full bg-pink-500 text-black font-bold py-2 rounded">
       Unlock Pass
     </button>
   </div>
 </div>
 
+<!-- APP -->
 <div id="app" class="overlay hidden flex flex-col items-center px-4 py-8">
 
-<h1 class="text-white text-4xl mb-2">Encore After Party</h1>
+<img src="cropped-fav.png" class="w-24 mb-3">
+
+<h1 class="text-white text-4xl mb-1">Encore After Party</h1>
 <p class="text-cyan-300 mb-6">Class of 2025–26 · Invite Only</p>
 
+<!-- COUNTDOWN -->
+<div class="glass max-w-md w-full p-4 rounded-xl text-center mb-6">
+  <p class="text-gray-400 text-sm">Event Countdown</p>
+  <p id="countdown" class="text-white text-xl font-bold"></p>
+</div>
+
+<!-- ID INPUT -->
 <div class="glass max-w-md w-full p-6 rounded-2xl mb-6">
-  <p class="text-gray-400 text-sm mb-3">Enter your unique ID</p>
+  <p class="text-gray-400 text-sm mb-3">Unique Pass ID</p>
   <input id="entryId" placeholder="JAI-0XX"
     class="w-full p-3 text-center text-lg uppercase rounded bg-black text-white mb-4">
   <button id="checkBtn"
-    class="w-full bg-pink-500 text-black font-bold py-3 rounded">
-    CHECK PASS STATUS
+    class="w-full bg-gradient-to-r from-pink-500 to-cyan-400 text-black font-bold py-3 rounded">
+    ACTIVATE PASS
   </button>
 </div>
 
+<!-- RESULT -->
 <div id="resultCard" class="glass max-w-md w-full p-6 rounded-2xl hidden text-center">
   <h3 id="resTitle" class="text-2xl mb-2"></h3>
-  <p id="resName" class="mb-1"></p>
-  <p id="resId" class="mb-1"></p>
+  <p id="resName"></p>
+  <p id="resId" class="mb-2"></p>
   <p id="resStatus" class="mb-4"></p>
 
   <button id="pdfBtn"
     class="bg-green-400 text-black font-bold px-6 py-3 rounded hidden">
-    Download Digital Pass (PDF)
+    Download Digital Pass
   </button>
 </div>
 
+<!-- INFO -->
 <div class="glass max-w-md w-full p-6 rounded-2xl mt-6 text-center text-sm text-gray-300">
   <p>📅 1 February 2026 · 5:00 PM</p>
   <p>📍 Saras Elysium, The Grand Arc Hotel</p>
 </div>
-
-<div class="max-w-md w-full mt-6 flex gap-4">
-  <a href="https://www.google.com/maps/search/?api=1&query=Saras+Elysium+The+Grand+Arc+Hotel"
-     target="_blank"
-     class="flex-1 bg-cyan-400 text-black font-bold py-3 rounded text-center">
-    Open Maps
-  </a>
-  <a href="https://wa.me/917007520015"
-     target="_blank"
-     class="flex-1 bg-green-400 text-black font-bold py-3 rounded text-center">
-    WhatsApp Help
-  </a>
-</div>
-
-<p class="text-xs text-gray-500 mt-6 text-center max-w-md">
-This digital pass is for reference only. Final entry is verified live at the gate.
-</p>
 
 </div>
 
@@ -97,7 +95,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, doc, getDoc } from
 "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* 🔴 REPLACE WITH YOUR REAL CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyBoMIeT_axIVSyyhBC8PRzcO9z0bhIIyXA",
   authDomain: "encore-entry-system.firebaseapp.com",
@@ -111,8 +108,10 @@ const btn = document.getElementById("checkBtn");
 const card = document.getElementById("resultCard");
 const pdfBtn = document.getElementById("pdfBtn");
 
+let currentName = "", currentId = "";
+
 btn.onclick = async () => {
-  const id = document.getElementById("entryId").value.trim().toUpperCase();
+  const id = entryId.value.trim().toUpperCase();
   if (!id) return;
 
   const ref = doc(db, "guest_list", id);
@@ -122,56 +121,78 @@ btn.onclick = async () => {
   pdfBtn.classList.add("hidden");
 
   if (!snap.exists()) {
-    setResult("❌ Invalid Pass", "", "", "Please check your ID", false);
+    show("❌ Invalid Pass", "", "", "ID not found", false);
     return;
   }
 
   const d = snap.data();
-  document.getElementById("resName").innerText = `Name: ${d.name}`;
-  document.getElementById("resId").innerText = `ID: ${id}`;
+  currentName = d.name;
+  currentId = id;
+
+  document.getElementById("resName").innerText = d.name;
+  document.getElementById("resId").innerText = id;
 
   if (d.checkedIn) {
-    setResult("🚫 Already Used", "", "", "This pass has been used", false);
+    show("🚫 Already Used", "", "", "This pass has been used", false);
   } else if (!d.paid) {
-    setResult("💰 Payment Pending", "", "", "Please contact organizer", false);
+    show("💰 Payment Pending", "", "", "Please contact organizer", false);
   } else {
-    setResult("🎉 Pass Active", "", "", "Eligible for entry", true);
+    show("🎉 Pass Active", "", "", "Show this at entry", true);
     confetti();
     pdfBtn.classList.remove("hidden");
   }
 };
 
-function setResult(title, n, i, status, ok) {
-  document.getElementById("resTitle").innerText = title;
-  document.getElementById("resStatus").innerText = status;
-  document.getElementById("resTitle").className =
-    ok ? "text-green-400 text-2xl" : "text-red-400 text-2xl";
+function show(title, n, i, status, ok) {
+  resTitle.innerText = title;
+  resStatus.innerText = status;
+  resTitle.className = ok ? "text-green-400 text-2xl" : "text-red-400 text-2xl";
 }
 
 pdfBtn.onclick = () => {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  doc.setFontSize(18);
-  doc.text("Encore After Party – Digital Pass", 20, 20);
+
+  doc.setFillColor(20,20,20);
+  doc.rect(0,0,210,297,'F');
+
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(22);
+  doc.text("Encore After Party", 105, 30, { align: "center" });
+
+  doc.setFontSize(14);
+  doc.text(`Name: ${currentName}`, 20, 60);
+  doc.text(`Pass ID: ${currentId}`, 20, 75);
+  doc.text("Date: 1 Feb 2026 · 5:00 PM", 20, 95);
+  doc.text("Venue: The Grand Arc Hotel", 20, 110);
+
   doc.setFontSize(12);
-  doc.text(document.getElementById("resName").innerText, 20, 40);
-  doc.text(document.getElementById("resId").innerText, 20, 50);
-  doc.text("Status: Eligible for Entry", 20, 60);
-  doc.text("Note: Final verification happens at the gate.", 20, 80);
-  doc.save("Encore_Digital_Pass.pdf");
+  doc.text("“One night. One memory. One legacy.”", 105, 150, { align: "center" });
+
+  doc.save(`Encore_Pass_${currentId}.pdf`);
 };
 </script>
 
 <script>
 const PASSWORD = "ENCORE2026";
 function unlock() {
-  if (document.getElementById("pw").value === PASSWORD) {
-    document.getElementById("passwordGate").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
-  } else {
-    alert("Wrong access code");
-  }
+  if (pw.value === PASSWORD) {
+    passwordGate.classList.add("hidden");
+    app.classList.remove("hidden");
+  } else alert("Wrong access code");
 }
+
+// COUNTDOWN
+const eventTime = new Date("2026-02-01T17:00:00").getTime();
+setInterval(() => {
+  const now = new Date().getTime();
+  const diff = eventTime - now;
+  if (diff < 0) return countdown.innerText = "Now Admitting Guests";
+  const d = Math.floor(diff / (1000*60*60*24));
+  const h = Math.floor((diff / (1000*60*60)) % 24);
+  const m = Math.floor((diff / (1000*60)) % 60);
+  countdown.innerText = `${d}d ${h}h ${m}m`;
+}, 1000);
 </script>
 
 </body>
