@@ -42,6 +42,8 @@ What you need to do in GitHub:
    - `NODE_ENV=production`
    - `PORT=4000`
    - `DATABASE_URL=<render-postgres-external-url>`
+   - `DB_SSL=true`
+   - `DB_SSL_REJECT_UNAUTHORIZED=false`
    - `AUTH_SECRET=<long-random-secret>`
    - `APP_ADMIN_USERNAME=<your-admin-user>`
    - `APP_ADMIN_PASSWORD=<your-strong-password>`

@@ -46,6 +46,7 @@ Open these URLs:
   - `APP_ADMIN_PASSWORD`
   - `APP_ADMIN_DISPLAY_NAME`
   - `AUTH_SECRET` (required for production)
+  - `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` for managed Postgres
 
 ## Notes
 

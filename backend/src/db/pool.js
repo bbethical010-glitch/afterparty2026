@@ -3,9 +3,17 @@ import { env } from '../config/env.js';
 
 const { Pool } = pg;
 
-export const pool = new Pool({
+const poolConfig = {
   connectionString: env.databaseUrl
-});
+};
+
+if (env.databaseSsl) {
+  poolConfig.ssl = {
+    rejectUnauthorized: env.databaseSslRejectUnauthorized
+  };
+}
+
+export const pool = new Pool(poolConfig);
 
 export async function withTransaction(callback) {
   const client = await pool.connect();
