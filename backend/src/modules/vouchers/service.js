@@ -10,6 +10,31 @@ const VOUCHER_PREFIX = {
   CONTRA: 'CV'
 };
 
+function normalizeIsoDate(dateValue, fieldName = 'voucherDate') {
+  if (typeof dateValue === 'string') {
+    const trimmed = dateValue.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  } else if (dateValue instanceof Date) {
+    if (!Number.isNaN(dateValue.getTime())) {
+      return dateValue.toISOString().slice(0, 10);
+    }
+  } else if (typeof dateValue === 'number') {
+    const parsed = new Date(dateValue);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  throw httpError(400, `Invalid ${fieldName}`);
+}
+
 function ensureLines(lines) {
   if (!Array.isArray(lines) || lines.length < 2) {
     throw httpError(400, 'Voucher requires at least two lines');
@@ -53,7 +78,8 @@ async function assertAccountsBelongToBusiness(client, businessId, lines) {
 }
 
 function toDateParts(voucherDate) {
-  const [year, month] = voucherDate.split('-').map(Number);
+  const normalizedVoucherDate = normalizeIsoDate(voucherDate, 'voucherDate');
+  const [year, month] = normalizedVoucherDate.split('-').map(Number);
   if (!year || !month) {
     throw httpError(400, 'Invalid voucherDate');
   }
@@ -72,7 +98,8 @@ function getFinancialYearRange(voucherDate) {
 }
 
 async function getOrCreateFinancialYear(client, businessId, voucherDate) {
-  const range = getFinancialYearRange(voucherDate);
+  const postingDate = normalizeIsoDate(voucherDate, 'voucherDate');
+  const range = getFinancialYearRange(postingDate);
   const existing = await client.query(
     `SELECT id, is_closed AS "isClosed"
      FROM financial_years
@@ -80,7 +107,7 @@ async function getOrCreateFinancialYear(client, businessId, voucherDate) {
        AND start_date <= $2::date
        AND end_date >= $2::date
      LIMIT 1`,
-    [businessId, voucherDate]
+    [businessId, postingDate]
   );
 
   if (existing.rows[0]) {
@@ -101,7 +128,8 @@ async function getOrCreateFinancialYear(client, businessId, voucherDate) {
 }
 
 async function generateVoucherNumber(client, businessId, voucherType, voucherDate) {
-  const { label } = getFinancialYearRange(voucherDate);
+  const normalizedVoucherDate = normalizeIsoDate(voucherDate, 'voucherDate');
+  const { label } = getFinancialYearRange(normalizedVoucherDate);
   const start = `${label.slice(0, 4)}-04-01`;
   const end = `${Number(label.slice(0, 4)) + 1}-03-31`;
 
@@ -189,6 +217,7 @@ async function postDraftInternal(client, voucherId, actorId, forcedVoucherNumber
   }
 
   const voucher = voucherRes.rows[0];
+  const postingDate = normalizeIsoDate(voucher.voucherDate, 'voucherDate');
   if (voucher.status === 'POSTED' || voucher.status === 'REVERSED') {
     throw httpError(409, 'Voucher is already posted');
   }
@@ -206,13 +235,13 @@ async function postDraftInternal(client, voucherId, actorId, forcedVoucherNumber
     throw httpError(400, `Cannot post unbalanced voucher. Difference: ${totals.difference}`);
   }
 
-  const financialYearId = await getOrCreateFinancialYear(client, voucher.businessId, voucher.voucherDate);
+  const financialYearId = await getOrCreateFinancialYear(client, voucher.businessId, postingDate);
 
   const txnRes = await client.query(
     `INSERT INTO transactions (business_id, txn_date, narration)
      VALUES ($1, $2, $3)
      RETURNING id`,
-    [voucher.businessId, voucher.voucherDate, voucher.narration || null]
+    [voucher.businessId, postingDate, voucher.narration || null]
   );
   const transactionId = txnRes.rows[0].id;
 
@@ -231,14 +260,14 @@ async function postDraftInternal(client, voucherId, actorId, forcedVoucherNumber
       `INSERT INTO ledger_postings (
          business_id, financial_year_id, voucher_id, transaction_id, account_id, posting_date, debit, credit
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [voucher.businessId, financialYearId, voucher.id, transactionId, line.accountId, voucher.voucherDate, debit, credit]
+      [voucher.businessId, financialYearId, voucher.id, transactionId, line.accountId, postingDate, debit, credit]
     );
   }
 
   const voucherNumber =
     forcedVoucherNumber ||
     voucher.voucherNumber ||
-    (await generateVoucherNumber(client, voucher.businessId, voucher.voucherType, voucher.voucherDate));
+    (await generateVoucherNumber(client, voucher.businessId, voucher.voucherType, postingDate));
 
   await client.query(
     `UPDATE vouchers
@@ -267,13 +296,14 @@ export async function createVoucher(payload) {
   return withTransaction(async (client) => {
     ensureLines(payload.entries);
     await assertAccountsBelongToBusiness(client, payload.businessId, payload.entries);
+    const voucherDate = normalizeIsoDate(payload.voucherDate, 'voucherDate');
 
     const mode = payload.mode === 'DRAFT' ? 'DRAFT' : 'POST';
     const initialStatus = mode === 'DRAFT' ? 'DRAFT' : 'DRAFT';
     const voucherNumber =
       payload.voucherNumber ||
       (mode === 'POST'
-        ? await generateVoucherNumber(client, payload.businessId, payload.voucherType, payload.voucherDate)
+        ? await generateVoucherNumber(client, payload.businessId, payload.voucherType, voucherDate)
         : `TMP-${Date.now()}`);
 
     const voucherRes = await client.query(
@@ -281,7 +311,7 @@ export async function createVoucher(payload) {
          business_id, voucher_type, voucher_number, voucher_date, narration, status
        ) VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [payload.businessId, payload.voucherType, voucherNumber, payload.voucherDate, payload.narration || null, initialStatus]
+      [payload.businessId, payload.voucherType, voucherNumber, voucherDate, payload.narration || null, initialStatus]
     );
 
     const voucherId = voucherRes.rows[0].id;
@@ -296,7 +326,7 @@ export async function createVoucher(payload) {
       afterJson: {
         voucherType: payload.voucherType,
         voucherNumber,
-        voucherDate: payload.voucherDate,
+        voucherDate,
         narration: payload.narration,
         mode,
         totals: computeTotals(payload.entries)
@@ -379,7 +409,11 @@ export async function listVouchers(params) {
     );
 
     return {
-      items: rows.rows,
+      items: rows.rows.map((row) => ({
+        ...row,
+        voucherDate: normalizeIsoDate(row.voucherDate, 'voucherDate'),
+        grossAmount: Number(row.grossAmount || 0)
+      })),
       page: {
         limit,
         offset,
@@ -413,7 +447,7 @@ export async function getVoucherById(voucherId, businessId) {
     const entries = await readVoucherLines(client, voucher.id, voucher.transactionId);
     const totals = computeTotals(entries);
 
-    return { ...voucher, entries, totals };
+    return { ...voucher, voucherDate: normalizeIsoDate(voucher.voucherDate, 'voucherDate'), entries, totals };
   });
 }
 
@@ -449,7 +483,7 @@ export async function postVoucher(voucherId, payload) {
         [
           payload.voucherType || null,
           payload.voucherNumber || null,
-          payload.voucherDate || null,
+          payload.voucherDate ? normalizeIsoDate(payload.voucherDate, 'voucherDate') : null,
           payload.narration || null,
           voucherId
         ]
@@ -543,7 +577,7 @@ export async function reverseVoucher(voucherId, payload) {
 
     await assertAccountsBelongToBusiness(client, payload.businessId, reversedLines);
 
-    const reversalDate = payload.reversalDate || new Date().toISOString().slice(0, 10);
+    const reversalDate = normalizeIsoDate(payload.reversalDate || new Date(), 'reversalDate');
     const reversalNumber =
       payload.reversalVoucherNumber ||
       (await generateVoucherNumber(client, payload.businessId, original.voucherType, reversalDate));

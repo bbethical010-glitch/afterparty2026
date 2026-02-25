@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createHashRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell';
 import { RequireAuth } from '../auth/RequireAuth';
 import { GatewayPage } from '../pages/GatewayPage';
@@ -12,7 +12,7 @@ import { ProfitLossPage } from '../pages/ProfitLossPage';
 import { BalanceSheetPage } from '../pages/BalanceSheetPage';
 import { LoginPage } from '../pages/LoginPage';
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: '/login',
     element: <LoginPage />

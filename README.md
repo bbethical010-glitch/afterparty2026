@@ -58,3 +58,10 @@ Open these URLs:
 - Audit logs are stored in `audit_logs` for voucher lifecycle events.
 - Tally palette is defined in `frontend/src/styles/theme.js`.
 - Demo business ID is fixed as `00000000-0000-0000-0000-000000000001`.
+
+## Deploy
+
+- Frontend auto-deploy is configured via GitHub Actions workflow:
+  - `.github/workflows/deploy-pages.yml`
+- Full deployment steps (Pages + backend + PostgreSQL):
+  - `docs/DEPLOYMENT.md`
