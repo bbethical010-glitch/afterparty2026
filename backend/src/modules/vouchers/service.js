@@ -44,6 +44,23 @@ async function insertEntries(client, transactionId, entries) {
   }
 }
 
+async function insertAuditLog(client, params) {
+  await client.query(
+    `INSERT INTO audit_logs (business_id, actor_id, action, entity_type, entity_id, before_json, after_json, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)`,
+    [
+      params.businessId,
+      params.actorId || 'SYSTEM',
+      params.action,
+      params.entityType,
+      params.entityId,
+      params.beforeJson ? JSON.stringify(params.beforeJson) : null,
+      params.afterJson ? JSON.stringify(params.afterJson) : null,
+      params.metadata ? JSON.stringify(params.metadata) : null
+    ]
+  );
+}
+
 export async function createVoucher(payload) {
   validateEntries(payload.entries);
 
@@ -75,8 +92,25 @@ export async function createVoucher(payload) {
       ]
     );
 
+    const voucherId = voucherRes.rows[0].id;
+
+    await insertAuditLog(client, {
+      businessId: payload.businessId,
+      actorId: payload.actorId,
+      action: 'VOUCHER_CREATED',
+      entityType: 'voucher',
+      entityId: voucherId,
+      afterJson: {
+        voucherType: payload.voucherType,
+        voucherNumber: payload.voucherNumber,
+        voucherDate: payload.voucherDate,
+        narration: payload.narration,
+        entries: payload.entries
+      }
+    });
+
     return {
-      id: voucherRes.rows[0].id,
+      id: voucherId,
       transactionId
     };
   });
@@ -87,6 +121,9 @@ export async function getVoucherById(voucherId, businessId) {
     const voucherRes = await client.query(
       `SELECT v.id, v.voucher_type AS "voucherType", v.voucher_number AS "voucherNumber",
               v.voucher_date AS "voucherDate", v.narration,
+              v.is_reversed AS "isReversed",
+              v.reversed_by_voucher_id AS "reversedByVoucherId",
+              v.reversed_from_voucher_id AS "reversedFromVoucherId",
               t.id AS "transactionId"
        FROM vouchers v
        JOIN transactions t ON t.id = v.transaction_id
@@ -113,60 +150,138 @@ export async function getVoucherById(voucherId, businessId) {
   return result;
 }
 
-export async function updateVoucher(voucherId, payload) {
-  validateEntries(payload.entries);
+export async function updateVoucher() {
+  throw httpError(405, 'Vouchers are immutable after posting. Use reversal instead.');
+}
 
+export async function deleteVoucher() {
+  throw httpError(405, 'Vouchers are immutable after posting. Use reversal instead of delete.');
+}
+
+export async function reverseVoucher(voucherId, payload) {
   return withTransaction(async (client) => {
-    const existingRes = await client.query(
-      `SELECT v.id, v.transaction_id AS "transactionId"
+    const originalVoucherRes = await client.query(
+      `SELECT v.id, v.voucher_type AS "voucherType", v.voucher_number AS "voucherNumber",
+              v.voucher_date AS "voucherDate", v.narration,
+              v.transaction_id AS "transactionId", v.is_reversed AS "isReversed"
        FROM vouchers v
-       WHERE v.id = $1 AND v.business_id = $2`,
+       WHERE v.id = $1 AND v.business_id = $2
+       FOR UPDATE`,
       [voucherId, payload.businessId]
     );
 
-    if (existingRes.rows.length === 0) {
+    if (originalVoucherRes.rows.length === 0) {
       throw httpError(404, 'Voucher not found');
     }
 
-    await assertAccountsBelongToBusiness(client, payload.businessId, payload.entries);
-    const transactionId = existingRes.rows[0].transactionId;
+    const originalVoucher = originalVoucherRes.rows[0];
+    if (originalVoucher.isReversed) {
+      throw httpError(409, 'Voucher already reversed');
+    }
 
-    await client.query(
-      `UPDATE transactions
-       SET txn_date = $1, narration = $2
-       WHERE id = $3`,
-      [payload.voucherDate, payload.narration || null, transactionId]
+    const originalEntriesRes = await client.query(
+      `SELECT te.account_id AS "accountId", te.entry_type AS "entryType", te.amount
+       FROM transaction_entries te
+       WHERE te.transaction_id = $1
+       ORDER BY te.line_no`,
+      [originalVoucher.transactionId]
     );
+
+    const reversedEntries = originalEntriesRes.rows.map((line) => ({
+      accountId: line.accountId,
+      entryType: line.entryType === 'DR' ? 'CR' : 'DR',
+      amount: Number(line.amount)
+    }));
+
+    const reversalNarration =
+      payload.narration ||
+      `Reversal of ${originalVoucher.voucherType} ${originalVoucher.voucherNumber} dated ${originalVoucher.voucherDate}`;
+
+    const reversalTxnRes = await client.query(
+      `INSERT INTO transactions (business_id, txn_date, narration)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [payload.businessId, payload.reversalDate, reversalNarration]
+    );
+
+    const reversalTransactionId = reversalTxnRes.rows[0].id;
+    await insertEntries(client, reversalTransactionId, reversedEntries);
+
+    const reversalVoucherRes = await client.query(
+      `INSERT INTO vouchers (
+         business_id,
+         transaction_id,
+         voucher_type,
+         voucher_number,
+         voucher_date,
+         narration,
+         reversed_from_voucher_id,
+         is_system_generated
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+       RETURNING id`,
+      [
+        payload.businessId,
+        reversalTransactionId,
+        originalVoucher.voucherType,
+        payload.reversalVoucherNumber,
+        payload.reversalDate,
+        reversalNarration,
+        voucherId
+      ]
+    );
+
+    const reversalVoucherId = reversalVoucherRes.rows[0].id;
 
     await client.query(
       `UPDATE vouchers
-       SET voucher_type = $1, voucher_number = $2, voucher_date = $3, narration = $4
-       WHERE id = $5`,
-      [payload.voucherType, payload.voucherNumber, payload.voucherDate, payload.narration || null, voucherId]
+       SET is_reversed = TRUE,
+           reversed_by_voucher_id = $1
+       WHERE id = $2`,
+      [reversalVoucherId, voucherId]
     );
 
-    await client.query(`DELETE FROM transaction_entries WHERE transaction_id = $1`, [transactionId]);
-    await insertEntries(client, transactionId, payload.entries);
+    await insertAuditLog(client, {
+      businessId: payload.businessId,
+      actorId: payload.actorId,
+      action: 'VOUCHER_REVERSED',
+      entityType: 'voucher',
+      entityId: voucherId,
+      beforeJson: {
+        voucherType: originalVoucher.voucherType,
+        voucherNumber: originalVoucher.voucherNumber,
+        voucherDate: originalVoucher.voucherDate,
+        narration: originalVoucher.narration
+      },
+      afterJson: {
+        reversedByVoucherId: reversalVoucherId,
+        reversalVoucherNumber: payload.reversalVoucherNumber,
+        reversalDate: payload.reversalDate
+      },
+      metadata: {
+        reversalVoucherId
+      }
+    });
 
-    return { id: voucherId, transactionId };
-  });
-}
+    await insertAuditLog(client, {
+      businessId: payload.businessId,
+      actorId: payload.actorId,
+      action: 'VOUCHER_CREATED_BY_REVERSAL',
+      entityType: 'voucher',
+      entityId: reversalVoucherId,
+      afterJson: {
+        reversedFromVoucherId: voucherId,
+        voucherType: originalVoucher.voucherType,
+        voucherNumber: payload.reversalVoucherNumber,
+        voucherDate: payload.reversalDate,
+        entries: reversedEntries
+      }
+    });
 
-export async function deleteVoucher(voucherId, businessId) {
-  return withTransaction(async (client) => {
-    const result = await client.query(
-      `DELETE FROM vouchers
-       WHERE id = $1 AND business_id = $2
-       RETURNING transaction_id AS "transactionId"`,
-      [voucherId, businessId]
-    );
-
-    if (result.rows.length === 0) {
-      throw httpError(404, 'Voucher not found');
-    }
-
-    await client.query(`DELETE FROM transactions WHERE id = $1`, [result.rows[0].transactionId]);
-
-    return { ok: true };
+    return {
+      originalVoucherId: voucherId,
+      reversalVoucherId,
+      reversalTransactionId
+    };
   });
 }

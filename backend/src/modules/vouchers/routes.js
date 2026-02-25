@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { createVoucher, deleteVoucher, getVoucherById, updateVoucher } from './service.js';
+import { createVoucher, deleteVoucher, getVoucherById, reverseVoucher, updateVoucher } from './service.js';
 import { pool } from '../../db/pool.js';
 import { httpError } from '../../utils/httpError.js';
 
@@ -12,6 +12,7 @@ const voucherSchema = z.object({
   voucherNumber: z.string().min(1),
   voucherDate: z.string().date(),
   narration: z.string().optional(),
+  actorId: z.string().optional(),
   entries: z
     .array(
       z.object({
@@ -21,6 +22,14 @@ const voucherSchema = z.object({
       })
     )
     .min(2)
+});
+
+const reversalSchema = z.object({
+  businessId: z.string().uuid(),
+  reversalVoucherNumber: z.string().min(1),
+  reversalDate: z.string().date().optional(),
+  narration: z.string().optional(),
+  actorId: z.string().optional()
 });
 
 vouchersRouter.post('/', async (req, res, next) => {
@@ -49,6 +58,9 @@ vouchersRouter.get('/', async (req, res, next) => {
     const result = await pool.query(
       `SELECT v.id, v.voucher_type AS "voucherType", v.voucher_number AS "voucherNumber",
               v.voucher_date AS "voucherDate", v.narration,
+              v.is_reversed AS "isReversed",
+              v.reversed_by_voucher_id AS "reversedByVoucherId",
+              v.reversed_from_voucher_id AS "reversedFromVoucherId",
               t.id AS "transactionId", t.txn_date AS "transactionDate"
        FROM vouchers v
        JOIN transactions t ON t.id = v.transaction_id
@@ -75,6 +87,22 @@ vouchersRouter.get('/:voucherId', async (req, res, next) => {
     const voucher = await getVoucherById(req.params.voucherId, businessId);
     res.json(voucher);
   } catch (error) {
+    next(error);
+  }
+});
+
+vouchersRouter.post('/:voucherId/reverse', async (req, res, next) => {
+  try {
+    const payload = reversalSchema.parse(req.body);
+    const result = await reverseVoucher(req.params.voucherId, {
+      ...payload,
+      reversalDate: payload.reversalDate || new Date().toISOString().slice(0, 10)
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(httpError(400, 'Invalid reversal payload', error.issues));
+    }
     next(error);
   }
 });

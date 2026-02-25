@@ -9,7 +9,9 @@ function isTypingTarget(target) {
 export function useGlobalShortcuts(handlers) {
   useEffect(() => {
     function onKeyDown(event) {
-      if (event.altKey && event.key.toLowerCase() === 'c' && handlers.onCreate) {
+      const key = event.key.toLowerCase();
+      const createPressed = event.altKey && key === 'c';
+      if (createPressed && handlers.onCreate) {
         event.preventDefault();
         handlers.onCreate();
       }
@@ -19,7 +21,8 @@ export function useGlobalShortcuts(handlers) {
         handlers.onBack();
       }
 
-      if (event.key === 'Enter' && handlers.onSave && !isTypingTarget(event.target)) {
+      const savePressed = !isTypingTarget(event.target) && event.key === 'Enter';
+      if (savePressed && handlers.onSave) {
         event.preventDefault();
         handlers.onSave();
       }

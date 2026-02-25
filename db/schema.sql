@@ -94,12 +94,78 @@ CREATE TABLE IF NOT EXISTS vouchers (
   voucher_number TEXT NOT NULL,
   voucher_date DATE NOT NULL,
   narration TEXT,
+  is_reversed BOOLEAN NOT NULL DEFAULT FALSE,
+  reversed_by_voucher_id UUID REFERENCES vouchers(id) ON DELETE SET NULL,
+  reversed_from_voucher_id UUID REFERENCES vouchers(id) ON DELETE SET NULL,
+  is_system_generated BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (business_id, voucher_type, voucher_number, voucher_date)
 );
 
+ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS is_reversed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS reversed_by_voucher_id UUID REFERENCES vouchers(id) ON DELETE SET NULL;
+ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS reversed_from_voucher_id UUID REFERENCES vouchers(id) ON DELETE SET NULL;
+ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS is_system_generated BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers (business_id, voucher_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (business_id, txn_date);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  actor_id TEXT NOT NULL DEFAULT 'SYSTEM',
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  before_json JSONB,
+  after_json JSONB,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_business_created_at ON audit_logs (business_id, created_at DESC);
+
+CREATE OR REPLACE FUNCTION fn_prevent_voucher_mutation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'Vouchers are immutable and cannot be deleted';
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.business_id IS DISTINCT FROM NEW.business_id
+      OR OLD.transaction_id IS DISTINCT FROM NEW.transaction_id
+      OR OLD.voucher_type IS DISTINCT FROM NEW.voucher_type
+      OR OLD.voucher_number IS DISTINCT FROM NEW.voucher_number
+      OR OLD.voucher_date IS DISTINCT FROM NEW.voucher_date
+      OR OLD.narration IS DISTINCT FROM NEW.narration
+      OR OLD.reversed_from_voucher_id IS DISTINCT FROM NEW.reversed_from_voucher_id
+      OR OLD.is_system_generated IS DISTINCT FROM NEW.is_system_generated THEN
+      RAISE EXCEPTION 'Core voucher fields are immutable after posting';
+    END IF;
+
+    IF OLD.is_reversed = TRUE AND NEW.is_reversed = FALSE THEN
+      RAISE EXCEPTION 'Voucher reversal state cannot be reset';
+    END IF;
+
+    IF OLD.reversed_by_voucher_id IS NOT NULL
+      AND OLD.reversed_by_voucher_id IS DISTINCT FROM NEW.reversed_by_voucher_id THEN
+      RAISE EXCEPTION 'reversed_by_voucher_id cannot be modified once set';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_prevent_voucher_mutation ON vouchers;
+
+CREATE TRIGGER trg_prevent_voucher_mutation
+BEFORE UPDATE OR DELETE ON vouchers
+FOR EACH ROW
+EXECUTE FUNCTION fn_prevent_voucher_mutation();
 
 -- Enforce transaction integrity: at least 2 lines and DR total = CR total.
 CREATE OR REPLACE FUNCTION fn_validate_transaction_balance()

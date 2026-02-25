@@ -13,5 +13,9 @@ function required(key) {
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 4000),
-  databaseUrl: required('DATABASE_URL')
+  databaseUrl: required('DATABASE_URL'),
+  authSecret: process.env.AUTH_SECRET || 'dev-auth-secret-change-me',
+  adminUsername: process.env.APP_ADMIN_USERNAME || 'admin',
+  adminPassword: process.env.APP_ADMIN_PASSWORD || 'admin123',
+  adminDisplayName: process.env.APP_ADMIN_DISPLAY_NAME || 'Administrator'
 };

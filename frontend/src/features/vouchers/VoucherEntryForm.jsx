@@ -16,6 +16,8 @@ export function VoucherEntryForm({ voucherId }) {
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().slice(0, 10));
   const [narration, setNarration] = useState('');
   const [entries, setEntries] = useState([emptyLine, { ...emptyLine, entryType: 'CR' }]);
+  const [reversalVoucherNumber, setReversalVoucherNumber] = useState('');
+  const [reversalDate, setReversalDate] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts'],
@@ -41,6 +43,7 @@ export function VoucherEntryForm({ voucherId }) {
         amount: String(line.amount)
       }))
     );
+    setReversalVoucherNumber(`RV-${existingVoucher.voucherNumber}`);
   }, [existingVoucher]);
 
   const createVoucher = useMutation({
@@ -51,15 +54,13 @@ export function VoucherEntryForm({ voucherId }) {
         voucherNumber,
         voucherDate,
         narration,
+        actorId: 'SYSTEM',
         entries: entries.map((line) => ({
           accountId: line.accountId,
           entryType: line.entryType,
           amount: Number(line.amount)
         }))
       };
-      if (isEditMode) {
-        return api.put(`/vouchers/${voucherId}`, payload);
-      }
       return api.post('/vouchers', payload);
     },
     onSuccess: () => {
@@ -68,22 +69,32 @@ export function VoucherEntryForm({ voucherId }) {
       queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
       queryClient.invalidateQueries({ queryKey: ['profit-loss'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-      if (!isEditMode) {
-        setNarration('');
-        setEntries([emptyLine, { ...emptyLine, entryType: 'CR' }]);
-        const parsedVoucherNo = Number(voucherNumber);
-        if (Number.isFinite(parsedVoucherNo)) {
-          setVoucherNumber(String(parsedVoucherNo + 1));
-        }
+      setNarration('');
+      setEntries([emptyLine, { ...emptyLine, entryType: 'CR' }]);
+      const parsedVoucherNo = Number(voucherNumber);
+      if (Number.isFinite(parsedVoucherNo)) {
+        setVoucherNumber(String(parsedVoucherNo + 1));
       }
     }
   });
 
-  const removeVoucher = useMutation({
-    mutationFn: async () => api.delete(`/vouchers/${voucherId}?businessId=${DEMO_BUSINESS_ID}`),
-    onSuccess: () => {
+  const reverseVoucher = useMutation({
+    mutationFn: async () =>
+      api.post(`/vouchers/${voucherId}/reverse`, {
+        businessId: DEMO_BUSINESS_ID,
+        reversalVoucherNumber,
+        reversalDate,
+        narration: `Reversal of voucher ${voucherNumber}`,
+        actorId: 'SYSTEM'
+      }),
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });
-      navigate('/vouchers');
+      queryClient.invalidateQueries({ queryKey: ['voucher', voucherId] });
+      queryClient.invalidateQueries({ queryKey: ['daybook'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['profit-loss'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
+      navigate(`/vouchers/${result.reversalVoucherId}/edit`);
     }
   });
 
@@ -97,33 +108,44 @@ export function VoucherEntryForm({ voucherId }) {
     return { debit, credit };
   }, [entries]);
 
+  const fieldsDisabled = isEditMode;
+
   function updateLine(index, key, value) {
+    if (fieldsDisabled) return;
     setEntries((prev) => prev.map((line, i) => (i === index ? { ...line, [key]: value } : line)));
   }
 
   function addLine() {
+    if (fieldsDisabled) return;
     setEntries((prev) => [...prev, { ...emptyLine }]);
   }
 
   function submit(event) {
     event?.preventDefault();
+    if (fieldsDisabled) return;
     createVoucher.mutate();
   }
 
-  useGlobalShortcuts({
-    onSave: submit
-  });
+  useGlobalShortcuts(
+    fieldsDisabled
+      ? {
+          onSave: undefined
+        }
+      : {
+          onSave: submit
+        }
+  );
 
   function onFormKeyDown(event) {
-    if (event.altKey && event.key.toLowerCase() === 'a') {
+    if (!fieldsDisabled && event.altKey && event.key.toLowerCase() === 'a') {
       event.preventDefault();
       addLine();
       return;
     }
 
-    if (isEditMode && event.altKey && event.key.toLowerCase() === 'x') {
+    if (fieldsDisabled && !existingVoucher?.isReversed && event.altKey && event.key.toLowerCase() === 'r') {
       event.preventDefault();
-      removeVoucher.mutate();
+      reverseVoucher.mutate();
     }
   }
 
@@ -134,12 +156,17 @@ export function VoucherEntryForm({ voucherId }) {
   return (
     <form className="boxed shadow-panel" onSubmit={submit} onKeyDown={onFormKeyDown}>
       <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold">
-        {isEditMode ? 'Edit Voucher' : 'Voucher Entry'}
+        {isEditMode ? 'Voucher Details (Immutable)' : 'Voucher Entry'}
       </div>
       <div className="p-3 grid gap-3 md:grid-cols-4 text-sm">
         <label className="flex flex-col gap-1">
           Type
-          <select className="focusable border border-tally-panelBorder bg-white p-1" value={voucherType} onChange={(e) => setVoucherType(e.target.value)}>
+          <select
+            disabled={fieldsDisabled}
+            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+            value={voucherType}
+            onChange={(e) => setVoucherType(e.target.value)}
+          >
             {VOUCHER_TYPES.map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
@@ -147,15 +174,31 @@ export function VoucherEntryForm({ voucherId }) {
         </label>
         <label className="flex flex-col gap-1">
           Number
-          <input className="focusable border border-tally-panelBorder bg-white p-1" value={voucherNumber} onChange={(e) => setVoucherNumber(e.target.value)} />
+          <input
+            disabled={fieldsDisabled}
+            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+            value={voucherNumber}
+            onChange={(e) => setVoucherNumber(e.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
           Date
-          <input className="focusable border border-tally-panelBorder bg-white p-1" type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
+          <input
+            disabled={fieldsDisabled}
+            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+            type="date"
+            value={voucherDate}
+            onChange={(e) => setVoucherDate(e.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1 md:col-span-4">
           Narration
-          <input className="focusable border border-tally-panelBorder bg-white p-1" value={narration} onChange={(e) => setNarration(e.target.value)} />
+          <input
+            disabled={fieldsDisabled}
+            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+            value={narration}
+            onChange={(e) => setNarration(e.target.value)}
+          />
         </label>
       </div>
 
@@ -172,7 +215,8 @@ export function VoucherEntryForm({ voucherId }) {
             <tr key={idx}>
               <td>
                 <select
-                  className="focusable w-full border border-tally-panelBorder bg-white p-1"
+                  disabled={fieldsDisabled}
+                  className="focusable w-full border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
                   value={line.accountId}
                   onChange={(e) => updateLine(idx, 'accountId', e.target.value)}
                 >
@@ -184,7 +228,8 @@ export function VoucherEntryForm({ voucherId }) {
               </td>
               <td>
                 <select
-                  className="focusable w-full border border-tally-panelBorder bg-white p-1"
+                  disabled={fieldsDisabled}
+                  className="focusable w-full border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
                   value={line.entryType}
                   onChange={(e) => updateLine(idx, 'entryType', e.target.value)}
                 >
@@ -194,7 +239,8 @@ export function VoucherEntryForm({ voucherId }) {
               </td>
               <td>
                 <input
-                  className="focusable w-full text-right border border-tally-panelBorder bg-white p-1"
+                  disabled={fieldsDisabled}
+                  className="focusable w-full text-right border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
                   type="number"
                   min="0"
                   step="0.01"
@@ -217,23 +263,56 @@ export function VoucherEntryForm({ voucherId }) {
         </tfoot>
       </table>
 
-      <div className="p-3 flex gap-2 text-sm">
-        <button type="button" onClick={addLine} className="focusable boxed px-3 py-1">Alt+A Add Line</button>
-        <button type="submit" className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder">
-          Enter Save
-        </button>
-        {isEditMode && (
-          <button
-            type="button"
-            onClick={() => removeVoucher.mutate()}
-            className="focusable px-3 py-1 border border-tally-warning text-tally-warning"
-          >
-            Alt+X Delete
-          </button>
+      <div className="p-3 flex flex-wrap gap-2 text-sm items-center">
+        {!fieldsDisabled && (
+          <>
+            <button type="button" onClick={addLine} className="focusable boxed px-3 py-1">⌥A Add Line</button>
+            <button type="submit" className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder">
+              Enter Save
+            </button>
+          </>
         )}
+
+        {fieldsDisabled && (
+          <>
+            <span className="text-tally-accent font-semibold">Posted vouchers are immutable.</span>
+            {!existingVoucher?.isReversed && (
+              <>
+                <label className="flex items-center gap-1">
+                  Reversal No.
+                  <input
+                    className="focusable border border-tally-panelBorder bg-white p-1"
+                    value={reversalVoucherNumber}
+                    onChange={(e) => setReversalVoucherNumber(e.target.value)}
+                  />
+                </label>
+                <label className="flex items-center gap-1">
+                  Reversal Date
+                  <input
+                    className="focusable border border-tally-panelBorder bg-white p-1"
+                    type="date"
+                    value={reversalDate}
+                    onChange={(e) => setReversalDate(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => reverseVoucher.mutate()}
+                  className="focusable px-3 py-1 border border-tally-panelBorder bg-tally-header text-white"
+                >
+                  ⌥R Reverse Voucher
+                </button>
+              </>
+            )}
+            {existingVoucher?.isReversed && (
+              <span className="text-tally-warning">This voucher is already reversed.</span>
+            )}
+          </>
+        )}
+
         {createVoucher.isError && <span className="text-tally-warning">{createVoucher.error.message}</span>}
-        {removeVoucher.isError && <span className="text-tally-warning">{removeVoucher.error.message}</span>}
-        {createVoucher.isSuccess && <span className="text-tally-accent">{isEditMode ? 'Updated' : 'Saved'} voucher #{voucherNumber}</span>}
+        {reverseVoucher.isError && <span className="text-tally-warning">{reverseVoucher.error.message}</span>}
+        {createVoucher.isSuccess && <span className="text-tally-accent">Saved voucher #{voucherNumber}</span>}
       </div>
     </form>
   );

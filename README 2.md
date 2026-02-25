@@ -28,30 +28,16 @@ Open these URLs:
 
 ## Keyboard Shortcuts
 
-- `⌥C`: Open voucher creation
+- `Alt+C`: Open voucher creation
 - `Esc`: Return to Gateway
-- `Return`: Save voucher (when not typing in an input)
-- `⌥A`: Add voucher line
-- `⌥R`: Reverse voucher (voucher details mode)
+- `Enter`: Save voucher (when not typing in an input)
+- `Alt+A`: Add voucher line
+- `Alt+X`: Delete voucher (edit mode)
 - `N`: New voucher from voucher register
-
-## Login
-
-- Login URL: `http://localhost:5173/login`
-- Default credentials:
-  - Username: `admin`
-  - Password: `admin123`
-- Update credentials in `backend/.env`:
-  - `APP_ADMIN_USERNAME`
-  - `APP_ADMIN_PASSWORD`
-  - `APP_ADMIN_DISPLAY_NAME`
-  - `AUTH_SECRET` (required for production)
 
 ## Notes
 
 - Financial posting is server-side (`backend/src/modules/vouchers/service.js`).
 - Database trigger rejects unbalanced transactions at commit time.
-- Posted vouchers are immutable; corrections are done by reversal voucher posting.
-- Audit logs are stored in `audit_logs` for voucher create/reversal operations.
 - Tally palette is defined in `frontend/src/styles/theme.js`.
 - Demo business ID is fixed as `00000000-0000-0000-0000-000000000001`.

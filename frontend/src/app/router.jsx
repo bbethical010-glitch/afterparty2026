@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '../layouts/AppShell';
+import { RequireAuth } from '../auth/RequireAuth';
 import { GatewayPage } from '../pages/GatewayPage';
 import { VoucherPage } from '../pages/VoucherPage';
 import { VoucherRegisterPage } from '../pages/VoucherRegisterPage';
@@ -9,11 +10,20 @@ import { DaybookPage } from '../pages/DaybookPage';
 import { TrialBalancePage } from '../pages/TrialBalancePage';
 import { ProfitLossPage } from '../pages/ProfitLossPage';
 import { BalanceSheetPage } from '../pages/BalanceSheetPage';
+import { LoginPage } from '../pages/LoginPage';
 
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />
+  },
+  {
     path: '/',
-    element: <AppShell />,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <Navigate to="/gateway" replace /> },
       { path: 'gateway', element: <GatewayPage /> },
