@@ -7,6 +7,14 @@ import dotenv from 'dotenv';
 
 const { Pool } = pg;
 
+function parseOptionalBoolean(value) {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'require'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
 async function main() {
   const sqlPathArg = process.argv[2];
   if (!sqlPathArg) {
@@ -28,10 +36,21 @@ async function main() {
     throw new Error('Missing DATABASE_URL in environment');
   }
 
+  const explicitDbSsl = parseOptionalBoolean(process.env.DB_SSL);
+  const dbSslFromUrl = /sslmode=require|ssl=true/i.test(databaseUrl);
+  const managedDbHost = /(render\.com|neon\.tech|railway\.app|supabase\.co)/i.test(databaseUrl);
+  const useSsl = explicitDbSsl ?? (dbSslFromUrl || managedDbHost);
+  const rejectUnauthorized = parseOptionalBoolean(process.env.DB_SSL_REJECT_UNAUTHORIZED) ?? false;
+
   const sqlPath = path.resolve(__dirname, sqlPathArg);
   const sql = await fs.readFile(sqlPath, 'utf8');
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const poolConfig = { connectionString: databaseUrl };
+  if (useSsl) {
+    poolConfig.ssl = { rejectUnauthorized };
+  }
+
+  const pool = new Pool(poolConfig);
   const client = await pool.connect();
 
   try {
