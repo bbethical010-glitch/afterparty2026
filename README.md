@@ -47,6 +47,9 @@ Open these URLs:
   - `APP_ADMIN_DISPLAY_NAME`
   - `AUTH_SECRET` (required for production)
   - `DB_SSL` / `DB_SSL_REJECT_UNAUTHORIZED` for managed Postgres
+- Multi-user management:
+  - Login as owner and open `Users` from top bar (or press `⌥U`)
+  - Create additional users with role: `MANAGER`, `ACCOUNTANT`, `VIEWER`, or `OWNER`
 
 ## Notes
 
