@@ -1,19 +1,37 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
+import { USER_ROLES } from '../lib/constants';
+
+const REGISTERABLE_ROLES = USER_ROLES.filter((role) => role !== 'OWNER');
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+
+  const [mode, setMode] = useState('signin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [registerForm, setRegisterForm] = useState({
+    ownerUsername: '',
+    ownerPassword: '',
+    username: '',
+    displayName: '',
+    password: '',
+    role: 'ACCOUNTANT'
+  });
+  const [registerError, setRegisterError] = useState('');
+  const [registerSuccess, setRegisterSuccess] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+
   const targetPath = location.state?.from || '/gateway';
 
-  async function onSubmit(event) {
+  async function onSignIn(event) {
     event.preventDefault();
     setError('');
     setIsSubmitting(true);
@@ -28,40 +46,173 @@ export function LoginPage() {
     }
   }
 
+  function onRegisterChange(field, value) {
+    setRegisterForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function onSignUp(event) {
+    event.preventDefault();
+    setRegisterError('');
+    setRegisterSuccess('');
+    setIsRegistering(true);
+
+    try {
+      await api.post(
+        '/auth/register',
+        {
+          ownerUsername: registerForm.ownerUsername,
+          ownerPassword: registerForm.ownerPassword,
+          username: registerForm.username,
+          displayName: registerForm.displayName,
+          password: registerForm.password,
+          role: registerForm.role
+        },
+        { skipAuth: true }
+      );
+      setRegisterSuccess('User created successfully. You can sign in now.');
+      setRegisterForm((prev) => ({
+        ...prev,
+        ownerPassword: '',
+        username: '',
+        displayName: '',
+        password: ''
+      }));
+      setMode('signin');
+    } catch (err) {
+      setRegisterError(err.message || 'Sign up failed');
+    } finally {
+      setIsRegistering(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-tally-background text-tally-text flex items-center justify-center p-4">
-      <form className="boxed shadow-panel w-full max-w-md" onSubmit={onSubmit}>
-        <div className="bg-tally-header text-white px-4 py-2 text-sm font-semibold">Accounting ERP Login</div>
-        <div className="p-4 grid gap-3 text-sm">
-          <label className="flex flex-col gap-1">
-            Username
-            <input
-              autoFocus
-              className="focusable border border-tally-panelBorder bg-white p-2"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            Password
-            <input
-              type="password"
-              className="focusable border border-tally-panelBorder bg-white p-2"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
+      <div className="boxed shadow-panel w-full max-w-2xl">
+        <div className="bg-tally-header text-white px-4 py-2 text-sm font-semibold">Accounting ERP Access</div>
+        <div className="p-3 border-b border-tally-panelBorder flex gap-2 text-sm">
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-2 disabled:opacity-60"
+            type="button"
+            className={`focusable border px-3 py-1 ${mode === 'signin' ? 'bg-tally-header text-white border-tally-panelBorder' : 'bg-white border-tally-panelBorder'}`}
+            onClick={() => setMode('signin')}
           >
-            {isSubmitting ? 'Signing In...' : 'Sign In'}
+            Sign In
           </button>
-          {error && <div className="text-tally-warning">{error}</div>}
-          <div className="text-xs text-tally-accent">Default credentials: admin / admin123</div>
+          <button
+            type="button"
+            className={`focusable border px-3 py-1 ${mode === 'signup' ? 'bg-tally-header text-white border-tally-panelBorder' : 'bg-white border-tally-panelBorder'}`}
+            onClick={() => setMode('signup')}
+          >
+            Sign Up
+          </button>
         </div>
-      </form>
+
+        {mode === 'signin' ? (
+          <form className="p-4 grid gap-3 text-sm" onSubmit={onSignIn}>
+            <label className="flex flex-col gap-1">
+              Username
+              <input
+                autoFocus
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              Password
+              <input
+                type="password"
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-2 disabled:opacity-60"
+            >
+              {isSubmitting ? 'Signing In...' : 'Sign In'}
+            </button>
+            {error && <div className="text-tally-warning">{error}</div>}
+            {registerSuccess && <div className="text-emerald-700">{registerSuccess}</div>}
+          </form>
+        ) : (
+          <form className="p-4 grid gap-3 text-sm" onSubmit={onSignUp}>
+            <label className="flex flex-col gap-1">
+              Owner Username
+              <input
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.ownerUsername}
+                onChange={(e) => onRegisterChange('ownerUsername', e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              Owner Password
+              <input
+                type="password"
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.ownerPassword}
+                onChange={(e) => onRegisterChange('ownerPassword', e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              New Username
+              <input
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.username}
+                onChange={(e) => onRegisterChange('username', e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              Display Name
+              <input
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.displayName}
+                onChange={(e) => onRegisterChange('displayName', e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              New Password
+              <input
+                type="password"
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.password}
+                onChange={(e) => onRegisterChange('password', e.target.value)}
+                required
+                minLength={6}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              Role
+              <select
+                className="focusable border border-tally-panelBorder bg-white p-2"
+                value={registerForm.role}
+                onChange={(e) => onRegisterChange('role', e.target.value)}
+              >
+                {REGISTERABLE_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={isRegistering}
+              className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-2 disabled:opacity-60"
+            >
+              {isRegistering ? 'Creating User...' : 'Sign Up'}
+            </button>
+            {registerError && <div className="text-tally-warning">{registerError}</div>}
+          </form>
+        )}
+      </div>
     </div>
   );
 }

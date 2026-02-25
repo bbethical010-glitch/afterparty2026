@@ -24,6 +24,11 @@ const userCreateSchema = z.object({
   role: z.enum(USER_ROLES).default('ACCOUNTANT')
 });
 
+const registerSchema = userCreateSchema.extend({
+  ownerUsername: z.string().min(1),
+  ownerPassword: z.string().min(1)
+});
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(6).max(128)
@@ -107,6 +112,70 @@ authRouter.post('/login', async (req, res, next) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return next(httpError(400, 'Invalid login payload', error.issues));
+    }
+    next(error);
+  }
+});
+
+authRouter.post('/register', async (req, res, next) => {
+  try {
+    const payload = registerSchema.parse(req.body);
+    if (payload.role === 'OWNER') {
+      throw httpError(400, 'Owner role cannot be created from sign up');
+    }
+
+    const ownerResult = await pool.query(
+      `SELECT id, business_id AS "businessId", role, password_hash AS "passwordHash", is_active AS "isActive"
+       FROM app_users
+       WHERE LOWER(username) = LOWER($1)
+       LIMIT 1`,
+      [normalizeUsername(payload.ownerUsername)]
+    );
+
+    if (ownerResult.rows.length === 0) {
+      throw httpError(401, 'Invalid owner credentials');
+    }
+
+    const owner = ownerResult.rows[0];
+    if (!owner.isActive || owner.role !== 'OWNER') {
+      throw httpError(401, 'Invalid owner credentials');
+    }
+
+    if (!verifyPassword(payload.ownerPassword, owner.passwordHash)) {
+      throw httpError(401, 'Invalid owner credentials');
+    }
+
+    const businessId = payload.businessId || owner.businessId || DEFAULT_BUSINESS_ID;
+    const username = normalizeUsername(payload.username);
+    const passwordHash = hashPassword(payload.password);
+
+    const inserted = await pool.query(
+      `INSERT INTO app_users (
+         business_id,
+         username,
+         display_name,
+         password_hash,
+         role,
+         is_active,
+         created_by
+       ) VALUES ($1, $2, $3, $4, $5, TRUE, $6)
+       RETURNING id,
+                 business_id AS "businessId",
+                 username,
+                 display_name AS "displayName",
+                 role,
+                 is_active AS "isActive",
+                 created_at AS "createdAt"`,
+      [businessId, username, payload.displayName.trim(), passwordHash, payload.role, owner.id]
+    );
+
+    res.status(201).json(inserted.rows[0]);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(httpError(400, 'Invalid register payload', error.issues));
+    }
+    if (error?.code === '23505') {
+      return next(httpError(409, 'Username already exists'));
     }
     next(error);
   }
