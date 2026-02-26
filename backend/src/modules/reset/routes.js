@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { pool } from '../../db/pool.js';
 
 export const resetRouter = Router();
 
@@ -18,7 +19,7 @@ resetRouter.post('/', async (req, res) => {
         }
 
         // Verify company name matches
-        const { rows: [company] } = await req.app.locals.pool.query(
+        const { rows: [company] } = await pool.query(
             'SELECT name FROM businesses WHERE id = $1',
             [businessId]
         );
@@ -32,10 +33,8 @@ resetRouter.post('/', async (req, res) => {
         }
 
         // Wipe accounting data in dependency order
-        const pool = req.app.locals.pool;
         await pool.query('BEGIN');
         try {
-            await pool.query('DELETE FROM audit_log WHERE business_id = $1', [businessId]);
             await pool.query('DELETE FROM transactions WHERE business_id = $1', [businessId]);
             await pool.query('DELETE FROM vouchers WHERE business_id = $1', [businessId]);
             await pool.query('DELETE FROM accounts WHERE business_id = $1', [businessId]);

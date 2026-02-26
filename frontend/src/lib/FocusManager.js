@@ -31,14 +31,14 @@ export function useFocusList(itemCount, { initialIndex = 0, onSelect, onBack } =
         row?.scrollIntoView({ block: 'nearest' });
     }, [activeIndex]);
 
-    // Register keyboard handler at screen level (priority 50)
+    // Register keyboard handler at screen level (priority 50).
+    // Note: We register this even if itemCount is 0 so Esc/Backspace still works on empty lists!
     useEffect(() => {
-        if (itemCount <= 0) return;
 
         return registerKeyHandler(50, (event, keyString, isTyping) => {
-            // Only handle if our container is in the DOM and visible
+            // Only handle if our container is in the DOM
             const container = containerRef.current;
-            if (!container || !container.closest('main')) return false;
+            if (!container || !document.contains(container)) return false;
 
             // Don't handle arrow keys if user is typing
             if (isTyping && ['arrowdown', 'arrowup'].includes(keyString)) return false;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 
@@ -11,7 +11,15 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
     const { user } = useAuth();
     const [confirmText, setConfirmText] = useState('');
     const inputRef = useRef(null);
-    const companyName = user?.businessName || 'Company';
+
+    // Fetch exact business name to match backend expectation
+    const { data: business } = useQuery({
+        queryKey: ['business', user?.businessId],
+        queryFn: () => api.get('/businesses/me'),
+        enabled: Boolean(user?.businessId && open),
+    });
+
+    const companyName = business?.name || user?.businessName || 'Company';
 
     useEffect(() => {
         if (open) {
