@@ -159,6 +159,9 @@ export function GatewayMenu() {
     }
   });
 
+  const kpis = data?.kpis || {};
+  const alerts = data?.alerts || {};
+
   useEffect(() => {
     if (alerts && Object.keys(alerts).length > 0) {
       const issues = [];
@@ -175,9 +178,6 @@ export function GatewayMenu() {
   if (isLoading) {
     return <div className="boxed shadow-panel p-3 text-sm">Loading gateway dashboard...</div>;
   }
-
-  const kpis = data?.kpis || {};
-  const alerts = data?.alerts || {};
 
   return (
     <div className="grid gap-2">
