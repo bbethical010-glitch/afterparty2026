@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { VOUCHER_TYPES } from '../../lib/constants';
 import { useAuth } from '../../auth/AuthContext';
 import { LedgerSearch } from '../../components/LedgerSearch';
-import { useKeyboardHandler } from '../../providers/KeyboardProvider';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
 import { PrintModal } from '../../components/PrintModal';
+import { useViewState } from '../../providers/ViewStateProvider';
 
 const emptyLine = { accountId: '', entryType: 'DR', amount: '' };
 
@@ -23,12 +22,11 @@ function computeTotals(entries) {
 }
 
 export function VoucherEntryForm({ voucherId }) {
-  const navigate = useNavigate();
+  const { popScreen } = useViewState();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const businessId = user?.businessId;
-  const [searchParams] = useSearchParams();
-  const prefilledType = searchParams.get('vtype');
+  const prefilledType = null; // Passed via ViewState params if needed
 
   const [voucherType, setVoucherType] = useState(
     VOUCHER_TYPES.includes(prefilledType) ? prefilledType : 'JOURNAL'
@@ -109,7 +107,7 @@ export function VoucherEntryForm({ voucherId }) {
       queryClient.invalidateQueries({ queryKey: ['profit-loss'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       if (result.id) {
-        navigate(`/vouchers/${result.id}/edit`);
+        // Stay on this screen to show the saved voucher
       }
     }
   });
@@ -146,7 +144,7 @@ export function VoucherEntryForm({ voucherId }) {
       announceToScreenReader('Voucher cancelled');
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });
       queryClient.invalidateQueries({ queryKey: ['voucher', voucherId] });
-      navigate('/vouchers');
+      popScreen();
     }
   });
 
@@ -167,7 +165,7 @@ export function VoucherEntryForm({ voucherId }) {
       queryClient.invalidateQueries({ queryKey: ['profit-loss'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       if (result.reversalVoucherId) {
-        navigate(`/vouchers/${result.reversalVoucherId}/edit`);
+        popScreen();
       }
     }
   });

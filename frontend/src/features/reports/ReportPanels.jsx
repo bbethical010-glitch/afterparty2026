@@ -1,158 +1,191 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
+import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
+import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function Panel({ title, children }) {
-  return (
-    <section className="boxed shadow-panel">
-      <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold">{title}</div>
-      <div className="p-3 text-sm">{children}</div>
-    </section>
-  );
-}
-
-function PeriodFilter({ from, to, setFrom, setTo }) {
-  return (
-    <div className="grid gap-2 md:grid-cols-2 mb-3">
-      <input type="date" className="focusable border border-tally-panelBorder bg-white p-1" value={from} onChange={(e) => setFrom(e.target.value)} />
-      <input type="date" className="focusable border border-tally-panelBorder bg-white p-1" value={to} onChange={(e) => setTo(e.target.value)} />
-    </div>
-  );
-}
+/* ── Trial Balance ──────────────────────────── */
 
 export function TrialBalancePanel() {
-  const navigate = useNavigate();
+  const { pushScreen, popScreen } = useViewState();
   const { user } = useAuth();
   const businessId = user?.businessId;
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(today.slice(0, 4) + '-04-01');
   const [to, setTo] = useState(today);
-  const [expanded, setExpanded] = useState({});
+
+  // Internal drilldown stack
+  const [drillStack, setDrillStack] = useState([]); // each: { category, lines }
+  const level = drillStack.length; // 0 = categories, 1 = lines within category
 
   const { data } = useQuery({
     queryKey: ['trial-balance', businessId, from, to],
     enabled: Boolean(businessId),
-    queryFn: () => api.get(`/reports/trial-balance?from=${from}&to=${to}`)
+    queryFn: () => api.get(`/reports/trial-balance?from=${from}&to=${to}`),
   });
 
   const grouped = data?.grouped || {};
   const categories = useMemo(() => Object.keys(grouped), [grouped]);
 
+  // Determine what to display
+  const displayItems = level === 0
+    ? categories.map((cat) => ({
+      label: cat,
+      debit: grouped[cat]?.debit,
+      credit: grouped[cat]?.credit,
+      isCategory: true,
+    }))
+    : (drillStack[0]?.lines || []).map((line) => ({
+      label: `${line.code} — ${line.name}`,
+      debit: line.debit,
+      credit: line.credit,
+      accountId: line.accountId,
+      groupName: line.groupName,
+    }));
+
+  const { activeIndex, containerProps } = useFocusList(displayItems.length, {
+    onSelect: (idx) => {
+      const item = displayItems[idx];
+      if (level === 0 && item.isCategory) {
+        // Drill into category
+        setDrillStack([{ category: item.label, lines: grouped[item.label]?.lines || [] }]);
+      } else if (level === 1 && item.accountId) {
+        // Drill into ledger
+        pushScreen(SCREENS.LEDGER_LIST, { accountId: item.accountId });
+      }
+    },
+    onBack: () => {
+      if (level > 0) setDrillStack([]);
+      else popScreen();
+    },
+  });
+
+  useAutoFocus(containerProps.ref);
+
+  const breadcrumb = level === 0 ? 'Trial Balance' : `Trial Balance › ${drillStack[0]?.category}`;
+
   return (
-    <Panel title="Trial Balance">
-      <PeriodFilter from={from} to={to} setFrom={setFrom} setTo={setTo} />
+    <section className="tally-panel">
+      <div className="tally-panel-header">{breadcrumb}</div>
+      <div className="p-1 grid gap-1 md:grid-cols-2 text-xs">
+        <input type="date" className="tally-input" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="tally-input" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
 
       {!data?.isBalanced && (
-        <div className="boxed p-2 mb-2 text-tally-warning font-semibold">
-          Trial Balance mismatch: Difference ₹ {formatAmount(data?.difference)}
+        <div className="px-2 py-1 text-xs text-tally-warning font-bold border-b border-tally-panelBorder">
+          ⚠ Mismatch: ₹ {formatAmount(data?.difference)}
         </div>
       )}
 
-      <div className="grid gap-2">
-        {categories.map((category) => {
-          const block = grouped[category];
-          const isOpen = Boolean(expanded[category]);
-          return (
-            <div key={category} className="boxed">
-              <button
-                type="button"
-                className="focusable w-full text-left p-2 bg-tally-tableHeader font-semibold flex justify-between"
-                onClick={() => setExpanded((prev) => ({ ...prev, [category]: !prev[category] }))}
+      <div {...containerProps} className="max-h-[calc(100vh-200px)] overflow-auto" style={{ outline: 'none' }}>
+        <table className="w-full table-grid text-sm">
+          <thead className="tally-table-header">
+            <tr>
+              <th className="text-left">{level === 0 ? 'Category' : 'Account'}</th>
+              {level === 1 && <th className="text-left">Group</th>}
+              <th className="text-right">Debit</th>
+              <th className="text-right">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayItems.map((item, idx) => (
+              <tr
+                key={idx}
+                data-focus-index={idx}
+                className={`${idx === activeIndex ? 'tally-row-active' : ''} ${item.isCategory ? 'font-bold' : ''}`}
               >
-                <span>{category}</span>
-                <span>DR {formatAmount(block.debit)} | CR {formatAmount(block.credit)}</span>
-              </button>
-              {isOpen && (
-                <table className="w-full table-grid text-xs">
-                  <thead className="bg-tally-background">
-                    <tr><th>Code</th><th>Name</th><th>Group</th><th>Debit</th><th>Credit</th></tr>
-                  </thead>
-                  <tbody>
-                    {block.lines.map((line) => (
-                      <tr
-                        key={line.accountId || line.code}
-                        className={`${line.accountId ? 'hover:bg-tally-background cursor-pointer' : ''}`}
-                        tabIndex={0}
-                        onClick={() => {
-                          if (line.accountId) navigate(`/ledger?accountId=${line.accountId}`);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' && line.accountId) {
-                            event.preventDefault();
-                            navigate(`/ledger?accountId=${line.accountId}`);
-                          }
-                        }}
-                      >
-                        <td>{line.code}</td>
-                        <td>{line.name}</td>
-                        <td>{line.groupName}</td>
-                        <td>{formatAmount(line.debit)}</td>
-                        <td>{formatAmount(line.credit)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          );
-        })}
+                <td className="px-2 py-0.5">{item.label}</td>
+                {level === 1 && <td className="px-2 py-0.5 text-xs opacity-70">{item.groupName || ''}</td>}
+                <td className="text-right px-2 py-0.5 tally-amount">{formatAmount(item.debit)}</td>
+                <td className="text-right px-2 py-0.5 tally-amount">{formatAmount(item.credit)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="tally-table-header font-bold">
+              <td className="px-2 py-0.5" colSpan={level === 1 ? 2 : 1}>Totals</td>
+              <td className="text-right px-2 py-0.5 tally-amount">{formatAmount(data?.totals?.debit)}</td>
+              <td className="text-right px-2 py-0.5 tally-amount">{formatAmount(data?.totals?.credit)}</td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
-
-      <div className="boxed mt-3 p-2 font-semibold flex justify-between">
-        <span>Totals</span>
-        <span>DR {formatAmount(data?.totals?.debit)} | CR {formatAmount(data?.totals?.credit)}</span>
-      </div>
-      <p className="text-xs mt-2">Tip: Enter on any ledger row to drill down.</p>
-    </Panel>
+      <div className="tally-status-bar">↑↓ Navigate · Enter Drill · Esc/Backspace Back</div>
+    </section>
   );
 }
 
+/* ── Profit & Loss ──────────────────────────── */
+
 export function ProfitLossPanel() {
+  const { popScreen } = useViewState();
   const { user } = useAuth();
   const businessId = user?.businessId;
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(today.slice(0, 4) + '-04-01');
   const [to, setTo] = useState(today);
-  const compareFrom = `${Number(from.slice(0, 4)) - 1}${from.slice(4)}`;
-  const compareTo = `${Number(to.slice(0, 4)) - 1}${to.slice(4)}`;
 
   const { data } = useQuery({
     queryKey: ['profit-loss', businessId, from, to],
     enabled: Boolean(businessId),
-    queryFn: () =>
-      api.get(
-        `/reports/profit-loss?from=${from}&to=${to}&compareFrom=${compareFrom}&compareTo=${compareTo}`
-      )
+    queryFn: () => api.get(`/reports/profit-loss?from=${from}&to=${to}`),
   });
 
-  return (
-    <Panel title="Profit & Loss">
-      <PeriodFilter from={from} to={to} setFrom={setFrom} setTo={setTo} />
-      <div className="grid gap-2" role="listbox">
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Revenue</span><span>₹ {formatAmount(data?.income)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Expenses</span><span>₹ {formatAmount(data?.expense)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Gross Profit</span><span>₹ {formatAmount(data?.grossProfit)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Operating Profit</span><span>₹ {formatAmount(data?.operatingProfit)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between font-semibold hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Net Profit</span><span>₹ {formatAmount(data?.netProfit)}</span></div>
-      </div>
+  const rows = [
+    { label: 'Revenue', value: data?.income },
+    { label: 'Expenses', value: data?.expense },
+    { label: 'Gross Profit', value: data?.grossProfit },
+    { label: 'Operating Profit', value: data?.operatingProfit },
+    { label: 'Net Profit', value: data?.netProfit, bold: true },
+  ];
 
-      <div className="boxed mt-3 p-2">
-        <p className="font-semibold mb-1">Comparative (Previous Period)</p>
-        <p>Revenue: ₹ {formatAmount(data?.comparison?.income)}</p>
-        <p>Expenses: ₹ {formatAmount(data?.comparison?.expense)}</p>
-        <p>Net Profit: ₹ {formatAmount(data?.comparison?.netProfit)}</p>
+  const { activeIndex, containerProps } = useFocusList(rows.length, {
+    onBack: () => popScreen(),
+  });
+
+  useAutoFocus(containerProps.ref);
+
+  return (
+    <section className="tally-panel">
+      <div className="tally-panel-header">Profit & Loss</div>
+      <div className="p-1 grid gap-1 md:grid-cols-2 text-xs">
+        <input type="date" className="tally-input" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="tally-input" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
-    </Panel>
+      <div {...containerProps} style={{ outline: 'none' }}>
+        <table className="w-full table-grid text-sm">
+          <thead className="tally-table-header">
+            <tr><th className="text-left">Particulars</th><th className="text-right">Amount</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr
+                key={idx}
+                data-focus-index={idx}
+                className={`${idx === activeIndex ? 'tally-row-active' : ''} ${row.bold ? 'font-bold' : ''}`}
+              >
+                <td className="px-2 py-0.5">{row.label}</td>
+                <td className="text-right px-2 py-0.5 tally-amount">₹ {formatAmount(row.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="tally-status-bar">↑↓ Navigate · Esc Back</div>
+    </section>
   );
 }
 
+/* ── Balance Sheet ──────────────────────────── */
+
 export function BalanceSheetPanel() {
+  const { popScreen } = useViewState();
   const { user } = useAuth();
   const businessId = user?.businessId;
   const today = new Date().toISOString().slice(0, 10);
@@ -162,25 +195,56 @@ export function BalanceSheetPanel() {
   const { data } = useQuery({
     queryKey: ['balance-sheet', businessId, from, to],
     enabled: Boolean(businessId),
-    queryFn: () => api.get(`/reports/balance-sheet?from=${from}&to=${to}`)
+    queryFn: () => api.get(`/reports/balance-sheet?from=${from}&to=${to}`),
   });
 
+  const rows = [
+    { label: 'Total Assets', value: data?.assets },
+    { label: 'Total Liabilities', value: data?.liabilities },
+    { label: 'Equity (incl. retained earnings)', value: data?.equity },
+    { label: 'Retained Earnings', value: data?.retainedEarnings },
+    { label: 'Liabilities + Equity', value: data?.liabilitiesAndEquity, bold: true },
+  ];
+
+  const { activeIndex, containerProps } = useFocusList(rows.length, {
+    onBack: () => popScreen(),
+  });
+
+  useAutoFocus(containerProps.ref);
+
   return (
-    <Panel title="Balance Sheet">
-      <PeriodFilter from={from} to={to} setFrom={setFrom} setTo={setTo} />
-      <div className="grid gap-2" role="listbox">
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Total Assets</span><span>₹ {formatAmount(data?.assets)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Total Liabilities</span><span>₹ {formatAmount(data?.liabilities)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Equity (incl. retained earnings)</span><span>₹ {formatAmount(data?.equity)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Retained Earnings</span><span>₹ {formatAmount(data?.retainedEarnings)}</span></div>
-        <div className="focusable boxed p-2 flex justify-between font-semibold hover:bg-tally-rowHover hover:text-white" tabIndex={0}><span>Liabilities + Equity</span><span>₹ {formatAmount(data?.liabilitiesAndEquity)}</span></div>
+    <section className="tally-panel">
+      <div className="tally-panel-header">Balance Sheet</div>
+      <div className="p-1 grid gap-1 md:grid-cols-2 text-xs">
+        <input type="date" className="tally-input" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="tally-input" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      <div {...containerProps} style={{ outline: 'none' }}>
+        <table className="w-full table-grid text-sm">
+          <thead className="tally-table-header">
+            <tr><th className="text-left">Particulars</th><th className="text-right">Amount</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr
+                key={idx}
+                data-focus-index={idx}
+                className={`${idx === activeIndex ? 'tally-row-active' : ''} ${row.bold ? 'font-bold' : ''}`}
+              >
+                <td className="px-2 py-0.5">{row.label}</td>
+                <td className="text-right px-2 py-0.5 tally-amount">₹ {formatAmount(row.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {Math.abs(Number(data?.equationDifference || 0)) > 0.01 && (
-        <div className="boxed mt-3 p-2 text-tally-warning font-semibold">
-          Accounting equation mismatch: ₹ {formatAmount(data?.equationDifference)}
+        <div className="px-2 py-1 text-xs text-tally-warning font-bold border-t border-tally-panelBorder">
+          ⚠ Equation mismatch: ₹ {formatAmount(data?.equationDifference)}
         </div>
       )}
-    </Panel>
+      <div className="tally-status-bar">↑↓ Navigate · Esc Back</div>
+    </section>
   );
 }

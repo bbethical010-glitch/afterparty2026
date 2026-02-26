@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { GroupSelector } from '../../components/GroupSelector';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
+import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
 
 /**
  * LedgerCreateForm — Tally-style ledger creation form.
@@ -15,7 +15,7 @@ import { announceToScreenReader } from '../../hooks/useFocusUtilities';
  *   Esc          — go back
  */
 export function LedgerCreateForm() {
-    const navigate = useNavigate();
+    const { popScreen, pushScreen } = useViewState();
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const businessId = user?.businessId;
@@ -67,7 +67,7 @@ export function LedgerCreateForm() {
         onSuccess: () => {
             announceToScreenReader(`Ledger "${name}" created`);
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            navigate('/ledger');
+            popScreen();
         },
         onError: (err) => {
             setError(err.message || 'Failed to create ledger');
@@ -105,7 +105,7 @@ export function LedgerCreateForm() {
         }
         if (e.key === 'Escape') {
             e.preventDefault();
-            navigate(-1);
+            popScreen();
         }
     }
 
@@ -116,18 +116,18 @@ export function LedgerCreateForm() {
 
     return (
         <form
-            className="boxed shadow-panel"
+            className="tally-panel"
             onSubmit={handleSubmit}
             onKeyDown={handleFormKeyDown}
             aria-label="Create Ledger"
         >
             {/* Header */}
-            <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold flex items-center justify-between">
+            <div className="tally-panel-header flex items-center justify-between">
                 <span>Ledger Creation</span>
                 <span className="text-xs font-normal opacity-75">Ctrl+Enter Accept · Esc Quit</span>
             </div>
 
-            <div className="p-3 grid gap-3 text-sm max-w-xl">
+            <div className="p-2 grid gap-2 text-sm max-w-xl">
                 {/* Ledger Name */}
                 <label className="flex flex-col gap-1">
                     <span>
@@ -203,15 +203,15 @@ export function LedgerCreateForm() {
                     <button
                         type="button"
                         className="focusable boxed px-4 py-1"
-                        onClick={() => navigate(-1)}
+                        onClick={() => popScreen()}
                     >
                         Quit (Esc)
                     </button>
                 </div>
             </div>
 
-            <div className="px-3 py-1 border-t border-tally-panelBorder text-[11px] opacity-60">
-                Tab to move between fields · Ctrl+Enter to save · Esc to go back
+            <div className="tally-status-bar">
+                Tab fields · Ctrl+Enter Accept · Esc Back
             </div>
         </form>
     );

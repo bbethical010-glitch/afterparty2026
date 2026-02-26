@@ -2,63 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Base ────────────────────────────── */
 body {
   margin: 0;
   font-family: "Trebuchet MS", Verdana, sans-serif;
   background: #e1f2f0;
   color: #0f2f2a;
-  line-height: 1.3;
+  line-height: 1.2;
+  font-size: 13px;
 }
 
-.hotkey {
-  color: #1b4f48;
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.boxed {
+/* ── Tally Panel (replaces boxed + shadow-panel) ── */
+.tally-panel {
   border: 1px solid #5b8f88;
   background: #f3faf9;
 }
 
+.tally-panel-header {
+  background: #216159;
+  color: white;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 1px solid #5b8f88;
+}
+
+/* ── Tally Input (flat, dense, no rounded corners) ── */
+.tally-input {
+  border: 1px solid #5b8f88;
+  background: white;
+  padding: 2px 6px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+}
+
+.tally-input:focus {
+  border-color: #216159;
+  box-shadow: 0 0 0 1px #216159;
+}
+
+/* ── Tally Button (flat, minimal) ── */
+.tally-btn {
+  border: 1px solid #5b8f88;
+  background: #dff0ee;
+  padding: 1px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tally-btn:hover,
+.tally-btn:focus {
+  background: #c9e5e1;
+}
+
+.tally-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Tally Field Layout ── */
+.tally-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border-bottom: 1px solid #c9e5e1;
+}
+
+.tally-field-label {
+  min-width: 140px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ── Active Row (terminal-style focus highlight) ── */
+.tally-row-active {
+  background: #216159 !important;
+  color: white !important;
+}
+
+.tally-row-active td,
+.tally-row-active th {
+  color: white !important;
+}
+
+/* ── Section Row ── */
+.tally-section-row td {
+  padding: 3px 8px;
+}
+
+/* ── Table ── */
 .table-grid td,
 .table-grid th {
   border: 1px solid #6e9d96;
-  padding: 0.25rem 0.4rem;
+  padding: 1px 4px;
+  font-size: 12px;
 }
 
 .table-grid td {
   font-variant-numeric: tabular-nums;
 }
 
-.focusable:focus-visible {
-  outline: 2px solid #005a8f;
-  /* Distinct solid color */
-  outline-offset: 1px;
-  box-shadow: 0 0 0 3px rgba(0, 90, 143, 0.4);
+.tally-table-header {
+  background: #c9e5e1;
+  font-weight: 600;
+  font-size: 11px;
 }
 
-.hotkey-chip {
+.tally-table-header th,
+.tally-table-header td {
+  padding: 2px 4px;
+  border: 1px solid #6e9d96;
+}
+
+/* ── Monospaced Amounts ── */
+.tally-amount {
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Status Bar (bottom of each panel) ── */
+.tally-status-bar {
+  border-top: 1px solid #5b8f88;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #0f2f2a;
+  opacity: 0.7;
+  background: #dff0ee;
+}
+
+/* ── Focus ── */
+.focusable:focus-visible {
+  outline: 2px solid #005a8f;
+  outline-offset: 0px;
+}
+
+/* ── Kbd (shortcut key badge) ── */
+kbd {
+  display: inline-block;
   border: 1px solid #5b8f88;
   background: #dff0ee;
   color: #0f2f2a;
-  font-size: 0.7rem;
-  padding: 0.05rem 0.35rem;
+  font-size: 10px;
+  padding: 0 3px;
+  font-family: 'Courier New', monospace;
 }
 
+/* ── Command Overlay ── */
 .command-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(9, 33, 29, 0.38);
+  background: rgba(9, 33, 29, 0.5);
   z-index: 50;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 8vh;
+  padding-top: 6vh;
 }
 
 .command-palette {
-  width: min(720px, calc(100vw - 1rem));
+  width: min(600px, calc(100vw - 1rem));
 }
 
 .command-item {
@@ -66,70 +171,68 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.45rem 0.65rem;
+  padding: 2px 8px;
   border-bottom: 1px solid #c2dfdb;
   background: #f3faf9;
+  font-size: 12px;
 }
 
 .command-item-active {
-  background: #d3ebe7;
+  background: #216159;
+  color: white;
 }
 
 .command-main {
   display: grid;
   text-align: left;
-  gap: 0.1rem;
+  gap: 1px;
 }
 
 .command-hotkey {
-  font-size: 0.7rem;
+  font-size: 10px;
   border: 1px solid #5b8f88;
-  padding: 0.05rem 0.35rem;
+  padding: 0 3px;
   background: #e8f4f2;
 }
 
-/* 
- * Section 9: Keyboard First Mode Styles
- * If keyboard-first-mode is active, we can optionally hide the cursor 
- * over the main interface to emphasize keyboard navigation.
- */
+/* ── Hotkey Chip ── */
+.hotkey-chip {
+  border: 1px solid #5b8f88;
+  background: #dff0ee;
+  color: #0f2f2a;
+  font-size: 10px;
+  padding: 0 3px;
+}
+
+/* ── Keyboard First Mode ── */
 body.keyboard-first-mode {
   cursor: default;
 }
 
 body.keyboard-first-mode input,
 body.keyboard-first-mode button,
-body.keyboard-first-mode select {
+body.keyboard-first-mode select,
+body.keyboard-first-mode textarea {
   cursor: default;
-  /* Disable pointers */
 }
 
-/* Shadow panel for elevated cards */
-.shadow-panel {
-  box-shadow: 0 1px 4px rgba(15, 47, 42, 0.12);
-}
-
-/* Keyboard shortcut key badge */
-kbd {
-  display: inline-block;
+/* ── Legacy compat (boxed, shadow-panel) ── */
+.boxed {
   border: 1px solid #5b8f88;
-  background: #dff0ee;
-  color: #0f2f2a;
-  font-size: 0.7rem;
-  padding: 0.05rem 0.35rem;
-  font-family: 'Trebuchet MS', monospace;
-  border-radius: 2px;
+  background: #f3faf9;
 }
 
-/* Utility: hide during browser print */
+.shadow-panel {
+  /* No shadows — flat design */
+}
+
+/* ── Print ── */
 .no-print {
   display: block;
 }
 
-/* ── @media print ────────────────────────── */
 @media print {
 
-  /* Hide all navigation chrome */
   header,
   nav,
   aside,
@@ -139,7 +242,6 @@ kbd {
     display: none !important;
   }
 
-  /* Reset body for printing */
   body {
     background: white;
     color: black;
@@ -147,31 +249,19 @@ kbd {
     font-size: 11pt;
   }
 
-  /* Invoice print area: full page */
   #invoice-print-area {
     display: block !important;
     width: 100%;
     padding: 1cm;
-    box-shadow: none;
-    border: none;
   }
 
-  /* Tables look clean */
   .table-grid td,
   .table-grid th {
     border: 1px solid #aaa;
-    padding: 0.2rem 0.5rem;
+    padding: 2px 4px;
   }
 
-  /* Command overlay — hide overlay, keep content */
-  .command-overlay {
-    position: static;
-    background: white;
-    padding: 0;
-    display: block;
-  }
-
-  /* Remove shadows on boxed elements */
+  .tally-panel,
   .boxed,
   .shadow-panel {
     border: 1px solid #aaa;
