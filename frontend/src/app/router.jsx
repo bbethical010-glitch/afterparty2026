@@ -13,11 +13,21 @@ import { BalanceSheetPage } from '../pages/BalanceSheetPage';
 import { LoginPage } from '../pages/LoginPage';
 import { UsersPage } from '../pages/UsersPage';
 import { ChangePasswordPage } from '../pages/ChangePasswordPage';
+import { CompanySetupPage } from '../pages/CompanySetupPage';
+import { LedgerCreatePage } from '../pages/LedgerCreatePage';
 
 export const router = createHashRouter([
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: '/company-setup',
+    element: (
+      <RequireAuth>
+        <CompanySetupPage />
+      </RequireAuth>
+    )
   },
   {
     path: '/',
@@ -33,6 +43,7 @@ export const router = createHashRouter([
       { path: 'vouchers/new', element: <VoucherPage /> },
       { path: 'vouchers/:voucherId/edit', element: <VoucherEditPage /> },
       { path: 'ledger', element: <LedgerPage /> },
+      { path: 'ledger/new', element: <LedgerCreatePage /> },
       { path: 'daybook', element: <DaybookPage /> },
       { path: 'users', element: <UsersPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },

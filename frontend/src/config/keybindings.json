@@ -10,6 +10,19 @@
         "focusSearch": [
             "/",
             "ctrl+f"
+        ],
+        "selectCompany": [
+            "f1"
+        ],
+        "changeDate": [
+            "f2"
+        ],
+        "configure": [
+            "f12"
+        ],
+        "print": [
+            "ctrl+p",
+            "meta+p"
         ]
     },
     "gateway": {
@@ -50,6 +63,13 @@
         ],
         "selectCompany": [
             "f1"
+        ],
+        "changeDate": [
+            "f2"
+        ],
+        "print": [
+            "ctrl+p",
+            "meta+p"
         ]
     },
     "table": {
@@ -59,6 +79,13 @@
         "moveDown": [
             "arrowdown"
         ],
+        "drillDown": [
+            "enter"
+        ],
+        "drillUp": [
+            "backspace",
+            "escape"
+        ],
         "open": [
             "enter"
         ],
@@ -67,6 +94,9 @@
         ],
         "reverse": [
             "r"
+        ],
+        "goBack": [
+            "alt+arrowleft"
         ]
     }
 }

@@ -9,12 +9,14 @@ export const VOUCHER_QUICK_ACTIONS = [
 
 export function getGatewaySections(canManageUsers) {
   const masters = [
-    { id: 'masters-ledgers', label: 'Ledgers', path: '/ledger', hotkey: 'L', keywords: ['accounts', 'masters'] },
-    { id: 'masters-password', label: 'Change Password', path: '/change-password', hotkey: 'P', keywords: ['security'] }
+    { id: 'masters-ledger-create', label: 'Create Ledger', path: '/ledger/new', hotkey: 'L', keywords: ['accounts', 'masters', 'new ledger'] },
+    { id: 'masters-ledgers', label: 'Ledger Reports', path: '/ledger', hotkey: 'E', keywords: ['accounts', 'masters', 'view'] },
+    { id: 'masters-password', label: 'Change Password', path: '/change-password', hotkey: 'P', keywords: ['security'] },
+    { id: 'masters-company', label: 'Company Setup', path: '/company-setup', hotkey: 'Y', keywords: ['company', 'business'] }
   ];
 
   if (canManageUsers) {
-    masters.splice(1, 0, {
+    masters.splice(2, 0, {
       id: 'masters-users',
       label: 'Users',
       path: '/users',
@@ -27,7 +29,7 @@ export function getGatewaySections(canManageUsers) {
     {
       id: 'masters',
       label: 'Masters',
-      hint: 'Ledger and security setup',
+      hint: 'Ledger, groups & company setup',
       items: masters
     },
     {

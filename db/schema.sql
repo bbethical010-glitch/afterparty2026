@@ -35,8 +35,17 @@ CREATE TABLE IF NOT EXISTS businesses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   base_currency CHAR(3) NOT NULL DEFAULT 'INR',
+  address TEXT,
+  financial_year_start DATE,
+  updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add columns if upgrading from older schema
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS financial_year_start DATE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
 
 CREATE TABLE IF NOT EXISTS app_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { LedgerSearch } from '../../components/LedgerSearch';
 import { useKeyboardHandler } from '../../providers/KeyboardProvider';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
+import { PrintModal } from '../../components/PrintModal';
 
 const emptyLine = { accountId: '', entryType: 'DR', amount: '' };
 
@@ -40,6 +41,7 @@ export function VoucherEntryForm({ voucherId }) {
   const [lineError, setLineError] = useState('');
   const [reversalNumber, setReversalNumber] = useState('');
   const [reversalDate, setReversalDate] = useState(new Date().toISOString().slice(0, 10));
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
   const voucherTypeRef = useRef(null);
   const voucherDateRef = useRef(null);
   const narrationRef = useRef(null);
@@ -257,6 +259,17 @@ export function VoucherEntryForm({ voucherId }) {
   });
 
   function onFormKeyDown(event) {
+    // Ctrl+P / Cmd+P → Print (for POSTED vouchers)
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+      event.preventDefault();
+      if (isPosted) {
+        setIsPrintOpen(true);
+      } else {
+        announceToScreenReader('Print is only available for posted vouchers');
+      }
+      return;
+    }
+
     if (event.altKey && event.key.toLowerCase() === 'a') {
       event.preventDefault();
       addLine();
@@ -292,169 +305,194 @@ export function VoucherEntryForm({ voucherId }) {
   }
 
   return (
-    <form className="boxed shadow-panel" onSubmit={postNow} onKeyDown={onFormKeyDown} role="region" aria-label="Voucher Entry">
-      <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold flex items-center justify-between">
-        <span>{isEditMode ? `Voucher (${existingVoucher?.status || '...'})` : 'Voucher Entry'}</span>
-        <span className={totals.isBalanced ? '' : 'text-red-200'}>
-          DR {totals.debit.toFixed(2)} | CR {totals.credit.toFixed(2)} | Diff {totals.difference.toFixed(2)}
-        </span>
-      </div>
+    <>
+      <form className="boxed shadow-panel" onSubmit={postNow} onKeyDown={onFormKeyDown} role="region" aria-label="Voucher Entry">
+        <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold flex items-center justify-between">
+          <span>{isEditMode ? `Voucher (${existingVoucher?.status || '...'})` : 'Voucher Entry'}</span>
+          <span className={totals.isBalanced ? '' : 'text-red-200'}>
+            DR {totals.debit.toFixed(2)} | CR {totals.credit.toFixed(2)} | Diff {totals.difference.toFixed(2)}
+          </span>
+        </div>
 
-      <div className="p-3 grid gap-3 md:grid-cols-6 text-sm">
-        <label className="flex flex-col gap-1">
-          Type
-          <select
-            ref={voucherTypeRef}
-            disabled={!canEdit}
-            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-            value={voucherType}
-            onChange={(e) => setVoucherType(e.target.value)}
-          >
-            {VOUCHER_TYPES.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          Number
-          <input
-            disabled={!canEdit}
-            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-            value={voucherNumber}
-            onChange={(e) => setVoucherNumber(e.target.value)}
-            placeholder="Auto"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1">
-          Date
-          <input
-            ref={voucherDateRef}
-            disabled={!canEdit}
-            type="date"
-            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-            value={voucherDate}
-            onChange={(e) => setVoucherDate(e.target.value)}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 md:col-span-3">
-          Narration
-          <input
-            ref={narrationRef}
-            disabled={!canEdit}
-            className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-            value={narration}
-            onChange={(e) => setNarration(e.target.value)}
-          />
-        </label>
-      </div>
-
-      <table className="w-full table-grid text-sm">
-        <thead className="bg-tally-tableHeader">
-          <tr>
-            <th className="text-left">Particulars (Ledger)</th>
-            <th className="text-left">Group</th>
-            <th className="text-left">Dr/Cr</th>
-            <th className="text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((line, idx) => {
-            const selected = accounts.find((acc) => acc.id === line.accountId);
-            return (
-              <tr key={idx} className={!totals.isBalanced && ((totals.difference > 0 && line.entryType === 'DR') || (totals.difference < 0 && line.entryType === 'CR')) ? 'bg-red-50' : ''}>
-                <td>
-                  <LedgerSearch
-                    businessId={businessId}
-                    autoFocus={idx === 0}
-                    value={selected}
-                    onChange={(ledger) => updateLine(idx, 'accountId', ledger?.id || '')}
-                  />
-                </td>
-                <td>{selected?.groupName || '-'}</td>
-                <td>
-                  <select
-                    disabled={!canEdit}
-                    className="focusable w-full border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-                    value={line.entryType}
-                    onChange={(e) => updateLine(idx, 'entryType', e.target.value)}
-                  >
-                    <option value="DR">DR</option>
-                    <option value="CR">CR</option>
-                  </select>
-                </td>
-                <td>
-                  <input
-                    disabled={!canEdit}
-                    className="focusable w-full text-right border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={line.amount}
-                    onChange={(e) => updateLine(idx, 'amount', e.target.value)}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div className="p-3 flex flex-wrap gap-2 text-sm items-center">
-        <span className="text-xs">⌘/Ctrl+S Save/Post • ⌥A Add Line • ⌥L Ledger Search • ⌥1/2/3 Jump Fields</span>
-        {canEdit && (
-          <>
-            <button type="button" onClick={addLine} className="focusable boxed px-3 py-1">⌥A Add Line</button>
-            <button type="button" onClick={autoBalanceToLastLine} className="focusable boxed px-3 py-1">Auto Balance</button>
-            <button type="button" onClick={saveDraft} className="focusable boxed px-3 py-1">Save Draft</button>
-            <button
-              type="submit"
-              disabled={!totals.isBalanced}
-              className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder disabled:opacity-60"
+        <div className="p-3 grid gap-3 md:grid-cols-6 text-sm">
+          <label className="flex flex-col gap-1">
+            Type
+            <select
+              ref={voucherTypeRef}
+              disabled={!canEdit}
+              className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+              value={voucherType}
+              onChange={(e) => setVoucherType(e.target.value)}
             >
-              Post Voucher
-            </button>
-          </>
-        )}
+              {VOUCHER_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </label>
 
-        {isEditMode && existingVoucher?.status === 'DRAFT' && (
-          <>
-            <button type="button" onClick={() => postDraft.mutate()} disabled={!totals.isBalanced} className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder disabled:opacity-60">
-              Post Draft
-            </button>
-            <button type="button" onClick={() => cancelDraft.mutate()} className="focusable boxed px-3 py-1 text-tally-warning border border-tally-warning">
-              Cancel Draft
-            </button>
-          </>
-        )}
+          <label className="flex flex-col gap-1">
+            Number
+            <input
+              disabled={!canEdit}
+              className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+              value={voucherNumber}
+              onChange={(e) => setVoucherNumber(e.target.value)}
+              placeholder="Auto"
+            />
+          </label>
 
-        {isPosted && (
-          <>
-            <label className="flex items-center gap-1">
-              Reversal No
-              <input className="focusable border border-tally-panelBorder bg-white p-1" value={reversalNumber} onChange={(e) => setReversalNumber(e.target.value)} />
-            </label>
-            <label className="flex items-center gap-1">
-              Reversal Date
-              <input type="date" className="focusable border border-tally-panelBorder bg-white p-1" value={reversalDate} onChange={(e) => setReversalDate(e.target.value)} />
-            </label>
-            <button type="button" onClick={() => reverseVoucher.mutate()} className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder">
-              ⌥R Reverse
-            </button>
-          </>
-        )}
+          <label className="flex flex-col gap-1">
+            Date
+            <input
+              ref={voucherDateRef}
+              disabled={!canEdit}
+              type="date"
+              className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+              value={voucherDate}
+              onChange={(e) => setVoucherDate(e.target.value)}
+            />
+          </label>
 
-        {isReversed && <span className="text-tally-warning font-semibold">This voucher is reversed.</span>}
-        {isCancelled && <span className="text-tally-warning font-semibold">This voucher is cancelled.</span>}
+          <label className="flex flex-col gap-1 md:col-span-3">
+            Narration
+            <input
+              ref={narrationRef}
+              disabled={!canEdit}
+              className="focusable border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+              value={narration}
+              onChange={(e) => setNarration(e.target.value)}
+            />
+          </label>
+        </div>
 
-        {lineError && <span className="text-tally-warning">{lineError}</span>}
-        {createOrSaveDraft.isError && <span className="text-tally-warning">{createOrSaveDraft.error.message}</span>}
-        {postDraft.isError && <span className="text-tally-warning">{postDraft.error.message}</span>}
-        {cancelDraft.isError && <span className="text-tally-warning">{cancelDraft.error.message}</span>}
-        {reverseVoucher.isError && <span className="text-tally-warning">{reverseVoucher.error.message}</span>}
-      </div>
-    </form>
+        <table className="w-full table-grid text-sm">
+          <thead className="bg-tally-tableHeader">
+            <tr>
+              <th className="text-left">Particulars (Ledger)</th>
+              <th className="text-left">Group</th>
+              <th className="text-left">Dr/Cr</th>
+              <th className="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((line, idx) => {
+              const selected = accounts.find((acc) => acc.id === line.accountId);
+              return (
+                <tr key={idx} className={!totals.isBalanced && ((totals.difference > 0 && line.entryType === 'DR') || (totals.difference < 0 && line.entryType === 'CR')) ? 'bg-red-50' : ''}>
+                  <td>
+                    <LedgerSearch
+                      businessId={businessId}
+                      autoFocus={idx === 0}
+                      value={selected}
+                      onChange={(ledger) => updateLine(idx, 'accountId', ledger?.id || '')}
+                    />
+                  </td>
+                  <td>{selected?.groupName || '-'}</td>
+                  <td>
+                    <select
+                      disabled={!canEdit}
+                      className="focusable w-full border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+                      value={line.entryType}
+                      onChange={(e) => updateLine(idx, 'entryType', e.target.value)}
+                    >
+                      <option value="DR">DR</option>
+                      <option value="CR">CR</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      disabled={!canEdit}
+                      className="focusable w-full text-right border border-tally-panelBorder bg-white p-1 disabled:bg-gray-100"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={line.amount}
+                      onChange={(e) => updateLine(idx, 'amount', e.target.value)}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="p-3 flex flex-wrap gap-2 text-sm items-center">
+          <span className="text-xs">⌘/Ctrl+S Save/Post • ⌥A Add Line • ⌥L Ledger Search • ⌥1/2/3 Jump Fields</span>
+          {canEdit && (
+            <>
+              <button type="button" onClick={addLine} className="focusable boxed px-3 py-1">⌥A Add Line</button>
+              <button type="button" onClick={autoBalanceToLastLine} className="focusable boxed px-3 py-1">Auto Balance</button>
+              <button type="button" onClick={saveDraft} className="focusable boxed px-3 py-1">Save Draft</button>
+              <button
+                type="submit"
+                disabled={!totals.isBalanced}
+                className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder disabled:opacity-60"
+              >
+                Post Voucher
+              </button>
+            </>
+          )}
+
+          {isEditMode && existingVoucher?.status === 'DRAFT' && (
+            <>
+              <button type="button" onClick={() => postDraft.mutate()} disabled={!totals.isBalanced} className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder disabled:opacity-60">
+                Post Draft
+              </button>
+              <button type="button" onClick={() => cancelDraft.mutate()} className="focusable boxed px-3 py-1 text-tally-warning border border-tally-warning">
+                Cancel Draft
+              </button>
+            </>
+          )}
+
+          {isPosted && (
+            <>
+              <label className="flex items-center gap-1">
+                Reversal No
+                <input className="focusable border border-tally-panelBorder bg-white p-1" value={reversalNumber} onChange={(e) => setReversalNumber(e.target.value)} />
+              </label>
+              <label className="flex items-center gap-1">
+                Reversal Date
+                <input type="date" className="focusable border border-tally-panelBorder bg-white p-1" value={reversalDate} onChange={(e) => setReversalDate(e.target.value)} />
+              </label>
+              <button type="button" onClick={() => reverseVoucher.mutate()} className="focusable bg-tally-header text-white px-3 py-1 border border-tally-panelBorder">
+                ⌥R Reverse
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrintOpen(true)}
+                className="focusable boxed px-3 py-1 border border-tally-panelBorder"
+              >
+                🖨 Print (Ctrl+P)
+              </button>
+            </>
+          )}
+
+          {isReversed && <span className="text-tally-warning font-semibold">This voucher is reversed.</span>}
+          {isCancelled && <span className="text-tally-warning font-semibold">This voucher is cancelled.</span>}
+
+          {lineError && <span className="text-tally-warning">{lineError}</span>}
+          {createOrSaveDraft.isError && <span className="text-tally-warning">{createOrSaveDraft.error.message}</span>}
+          {postDraft.isError && <span className="text-tally-warning">{postDraft.error.message}</span>}
+          {cancelDraft.isError && <span className="text-tally-warning">{cancelDraft.error.message}</span>}
+          {reverseVoucher.isError && <span className="text-tally-warning">{reverseVoucher.error.message}</span>}
+        </div>
+      </form>
+
+      {/* Print Modal */}
+      <PrintModal
+        open={isPrintOpen}
+        onClose={() => setIsPrintOpen(false)}
+        voucher={existingVoucher
+          ? {
+            ...existingVoucher,
+            entries: (existingVoucher.entries || entries).map((line) => {
+              const account = accounts.find((a) => a.id === line.accountId);
+              return { ...line, accountName: account?.name || line.accountId };
+            })
+          }
+          : null}
+        company={null}
+      />
+    </>
   );
 }

@@ -103,3 +103,78 @@ body.keyboard-first-mode select {
   cursor: default;
   /* Disable pointers */
 }
+
+/* Shadow panel for elevated cards */
+.shadow-panel {
+  box-shadow: 0 1px 4px rgba(15, 47, 42, 0.12);
+}
+
+/* Keyboard shortcut key badge */
+kbd {
+  display: inline-block;
+  border: 1px solid #5b8f88;
+  background: #dff0ee;
+  color: #0f2f2a;
+  font-size: 0.7rem;
+  padding: 0.05rem 0.35rem;
+  font-family: 'Trebuchet MS', monospace;
+  border-radius: 2px;
+}
+
+/* Utility: hide during browser print */
+.no-print {
+  display: block;
+}
+
+/* ── @media print ────────────────────────── */
+@media print {
+
+  /* Hide all navigation chrome */
+  header,
+  nav,
+  aside,
+  .no-print,
+  button,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  /* Reset body for printing */
+  body {
+    background: white;
+    color: black;
+    font-family: 'Arial', sans-serif;
+    font-size: 11pt;
+  }
+
+  /* Invoice print area: full page */
+  #invoice-print-area {
+    display: block !important;
+    width: 100%;
+    padding: 1cm;
+    box-shadow: none;
+    border: none;
+  }
+
+  /* Tables look clean */
+  .table-grid td,
+  .table-grid th {
+    border: 1px solid #aaa;
+    padding: 0.2rem 0.5rem;
+  }
+
+  /* Command overlay — hide overlay, keep content */
+  .command-overlay {
+    position: static;
+    background: white;
+    padding: 0;
+    display: block;
+  }
+
+  /* Remove shadows on boxed elements */
+  .boxed,
+  .shadow-panel {
+    border: 1px solid #aaa;
+    box-shadow: none;
+  }
+}

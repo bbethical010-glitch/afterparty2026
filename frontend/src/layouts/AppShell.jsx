@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { useGlobalShortcuts } from '../hooks/useGlobalShortcuts';
 import { CommandPalette } from '../components/CommandPalette';
+import { DatePickerModal } from '../components/DatePickerModal';
 import { getCommandCatalog } from '../lib/navigation';
 import { useAuth } from '../auth/AuthContext';
 
@@ -12,12 +13,30 @@ export function AppShell() {
   const { user, logout } = useAuth();
   const canManageUsers = user?.role === 'OWNER';
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [workingDate, setWorkingDate] = useState(new Date().toISOString().slice(0, 10));
   const mainRef = useRef(null);
 
   const commands = useMemo(() => {
     const catalog = getCommandCatalog(canManageUsers);
     return [
       ...catalog,
+      {
+        id: 'company-setup',
+        label: 'Company Setup',
+        path: '/company-setup',
+        section: 'Masters',
+        hotkey: 'Y',
+        keywords: ['company', 'business', 'fy', 'financial year']
+      },
+      {
+        id: 'ledger-create',
+        label: 'Create Ledger',
+        path: '/ledger/new',
+        section: 'Masters',
+        hotkey: 'L',
+        keywords: ['create', 'ledger', 'account', 'new ledger']
+      },
       {
         id: 'logout',
         label: 'Logout',
@@ -40,7 +59,7 @@ export function AppShell() {
   }
 
   useGlobalShortcuts({
-    disabled: isPaletteOpen,
+    disabled: isPaletteOpen || isDatePickerOpen,
     onCreate: () => navigate('/vouchers/new'),
     onBack: () => navigate('/gateway'),
     onGateway: () => navigate('/gateway'),
@@ -48,17 +67,31 @@ export function AppShell() {
     onTransactions: () => navigate('/vouchers'),
     onUsers: canManageUsers ? () => navigate('/users') : undefined,
     onPassword: () => navigate('/change-password'),
-    onGoTo: () => setIsPaletteOpen(true)
+    onGoTo: () => setIsPaletteOpen(true),
+    // New handlers
+    onCompany: () => navigate('/company-setup'),
+    onChangeDate: () => setIsDatePickerOpen(true),
+    onConfigure: () => {
+      window.dispatchEvent(new CustomEvent('open-config'));
+    },
+    onPrint: () => {
+      window.dispatchEvent(new CustomEvent('open-print-preview'));
+    }
   });
 
   useEffect(() => {
-    if (isPaletteOpen) return;
+    if (isPaletteOpen || isDatePickerOpen) return;
     requestAnimationFrame(() => mainRef.current?.focus());
-  }, [location.pathname, isPaletteOpen]);
+  }, [location.pathname, isPaletteOpen, isDatePickerOpen]);
 
   return (
     <div className="min-h-screen bg-tally-background text-tally-text">
-      <TopBar onOpenGoTo={() => setIsPaletteOpen(true)} />
+      {/* Working date badge in top bar context */}
+      <TopBar
+        onOpenGoTo={() => setIsPaletteOpen(true)}
+        workingDate={workingDate}
+        onOpenDatePicker={() => setIsDatePickerOpen(true)}
+      />
       <main ref={mainRef} tabIndex={-1} className="p-2 md:p-3 focus:outline-none">
         <Outlet />
       </main>
@@ -67,6 +100,15 @@ export function AppShell() {
         commands={commands}
         onClose={() => setIsPaletteOpen(false)}
         onNavigate={navigateFromPalette}
+      />
+      <DatePickerModal
+        open={isDatePickerOpen}
+        currentDate={workingDate}
+        onClose={() => setIsDatePickerOpen(false)}
+        onDateChange={(date) => {
+          setWorkingDate(date);
+          setIsDatePickerOpen(false);
+        }}
       />
     </div>
   );

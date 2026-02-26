@@ -21,7 +21,6 @@ export function LoginPage() {
     password: ''
   });
   const [registerError, setRegisterError] = useState('');
-  const [registerSuccess, setRegisterSuccess] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
   const targetPath = location.state?.from || '/gateway';
@@ -30,7 +29,6 @@ export function LoginPage() {
     event.preventDefault();
     setError('');
     setIsSubmitting(true);
-
     try {
       await login({ username, password });
       navigate(targetPath, { replace: true });
@@ -48,11 +46,10 @@ export function LoginPage() {
   async function onSignUp(event) {
     event.preventDefault();
     setRegisterError('');
-    setRegisterSuccess('');
     setIsRegistering(true);
-
     try {
-      await api.post(
+      // Backend returns {token, user} on signup — auto-login immediately
+      const result = await api.post(
         '/auth/signup',
         {
           companyName: registerForm.companyName,
@@ -62,15 +59,13 @@ export function LoginPage() {
         },
         { skipAuth: true }
       );
-      setRegisterSuccess('User created successfully. You can sign in now.');
-      setRegisterForm((prev) => ({
-        ...prev,
-        companyName: '',
-        username: '',
-        displayName: '',
-        password: ''
-      }));
-      setMode('signin');
+      // Store the token so AuthContext picks it up (same keys login() uses)
+      localStorage.setItem('erp_auth_token', result.token);
+      localStorage.setItem('erp_auth_user', JSON.stringify(result.user));
+      // Then call login() to refresh internal auth state
+      await login({ username: registerForm.username, password: registerForm.password });
+      // Redirect to company setup to fill in Financial Year / Address
+      navigate('/company-setup', { replace: true });
     } catch (err) {
       setRegisterError(err.message || 'Sign up failed');
     } finally {
@@ -78,25 +73,41 @@ export function LoginPage() {
     }
   }
 
+  function onTabKeyDown(e) {
+    if (e.key === 'Escape') {
+      setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-tally-background text-tally-text flex items-center justify-center p-4">
+    <div
+      className="min-h-screen bg-tally-background text-tally-text flex items-center justify-center p-4"
+      onKeyDown={onTabKeyDown}
+    >
       <div className="boxed shadow-panel w-full max-w-2xl">
-        <div className="bg-tally-header text-white px-4 py-2 text-sm font-semibold">Accounting ERP Access</div>
+        {/* App header */}
+        <div className="bg-tally-header text-white px-4 py-3">
+          <div className="text-base font-semibold">Tally-style Accounting ERP</div>
+          <div className="text-xs opacity-75 mt-0.5">Keyboard-driven accounting for India & beyond</div>
+        </div>
+
+        {/* Mode tabs */}
         <div className="p-3 border-b border-tally-panelBorder flex gap-2 text-sm">
           <button
             type="button"
-            className={`focusable border px-3 py-1 ${mode === 'signin' ? 'bg-tally-header text-white border-tally-panelBorder' : 'bg-white border-tally-panelBorder'}`}
+            className={`focusable border px-3 py-1 ${mode === 'signin' ? 'bg-tally-header text-white border-tally-panelBorder' : 'boxed border-tally-panelBorder'}`}
             onClick={() => setMode('signin')}
           >
             Sign In
           </button>
           <button
             type="button"
-            className={`focusable border px-3 py-1 ${mode === 'signup' ? 'bg-tally-header text-white border-tally-panelBorder' : 'bg-white border-tally-panelBorder'}`}
+            className={`focusable border px-3 py-1 ${mode === 'signup' ? 'bg-tally-header text-white border-tally-panelBorder' : 'boxed border-tally-panelBorder'}`}
             onClick={() => setMode('signup')}
           >
-            Sign Up
+            Sign Up (Create Company)
           </button>
+          <span className="ml-auto text-[11px] opacity-60 self-center">Esc to toggle · Tab to move · Enter to submit</span>
         </div>
 
         {mode === 'signin' ? (
@@ -126,16 +137,16 @@ export function LoginPage() {
               disabled={isSubmitting}
               className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-2 disabled:opacity-60"
             >
-              {isSubmitting ? 'Signing In...' : 'Sign In'}
+              {isSubmitting ? 'Signing In...' : 'Sign In (Enter)'}
             </button>
-            {error && <div className="text-tally-warning">{error}</div>}
-            {registerSuccess && <div className="text-emerald-700">{registerSuccess}</div>}
+            {error && <div className="text-tally-warning text-xs">{error}</div>}
           </form>
         ) : (
           <form className="p-4 grid gap-3 text-sm" onSubmit={onSignUp}>
             <label className="flex flex-col gap-1">
               Company Name
               <input
+                autoFocus
                 className="focusable border border-tally-panelBorder bg-white p-2"
                 value={registerForm.companyName}
                 onChange={(e) => onRegisterChange('companyName', e.target.value)}
@@ -143,7 +154,7 @@ export function LoginPage() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              New Username
+              Username
               <input
                 className="focusable border border-tally-panelBorder bg-white p-2"
                 value={registerForm.username}
@@ -161,7 +172,7 @@ export function LoginPage() {
               />
             </label>
             <label className="flex flex-col gap-1">
-              New Password
+              Password
               <input
                 type="password"
                 className="focusable border border-tally-panelBorder bg-white p-2"
@@ -176,11 +187,14 @@ export function LoginPage() {
               disabled={isRegistering}
               className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-2 disabled:opacity-60"
             >
-              {isRegistering ? 'Creating User...' : 'Sign Up'}
+              {isRegistering ? 'Creating Company...' : 'Create Company (Enter)'}
             </button>
-            {registerError && <div className="text-tally-warning">{registerError}</div>}
+            {registerError && <div className="text-tally-warning text-xs">{registerError}</div>}
           </form>
         )}
+        <div className="px-4 py-2 border-t border-tally-panelBorder text-[11px] opacity-60">
+          Tab to move between fields · Enter to submit · Esc to toggle Sign In / Sign Up
+        </div>
       </div>
     </div>
   );
