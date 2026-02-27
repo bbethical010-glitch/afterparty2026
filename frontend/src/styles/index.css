@@ -38,8 +38,10 @@ body {
 }
 
 .tally-input:focus {
-  border-color: #216159;
-  box-shadow: 0 0 0 1px #216159;
+  background-color: #0f2f2a;
+  color: #ffffff;
+  border-color: #0f2f2a;
+  outline: none;
 }
 
 /* ── Tally Button (flat, minimal) ── */
@@ -134,9 +136,17 @@ body {
 }
 
 /* ── Focus ── */
+.focusable:focus,
 .focusable:focus-visible {
-  outline: 2px solid #005a8f;
-  outline-offset: 0px;
+  background-color: #0f2f2a !important;
+  color: #ffffff !important;
+  border-color: #0f2f2a !important;
+  outline: none;
+}
+
+/* Ensure inner text is white too when focused */
+.focusable:focus::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Kbd (shortcut key badge) ── */

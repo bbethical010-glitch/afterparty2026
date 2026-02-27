@@ -46,15 +46,15 @@ export function GroupSelector({ value, onChange, disabled = false }) {
         requestAnimationFrame(() => listRef.current?.focus());
     }
 
-    function close() {
+    function close(focusTrigger = true) {
         setOpen(false);
         setQuery('');
-        triggerRef.current?.focus();
+        if (focusTrigger) triggerRef.current?.focus();
     }
 
     function select(group) {
         onChange(group.code, group.label, group.category);
-        close();
+        close(false); // Do not steal focus back, allow useEnterToAdvance to move it to the next field
     }
 
     function onKeyDown(e) {
@@ -124,6 +124,7 @@ export function GroupSelector({ value, onChange, disabled = false }) {
                 disabled={disabled}
                 className="focusable w-full border border-tally-panelBorder bg-white p-1 text-left text-sm flex items-center justify-between disabled:bg-gray-100"
                 onClick={openList}
+                onFocus={openList}
                 onKeyDown={onKeyDown}
                 aria-haspopup="listbox"
                 aria-expanded={open}

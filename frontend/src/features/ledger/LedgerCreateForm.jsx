@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { GroupSelector } from '../../components/GroupSelector';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
 import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
+import { useEnterToAdvance } from '../../hooks/useEnterToAdvance';
 
 /**
  * LedgerCreateForm — Tally-style ledger creation form.
@@ -28,6 +29,13 @@ export function LedgerCreateForm() {
     const [error, setError] = useState('');
 
     const nameRef = useRef(null);
+    const formRef = useRef(null);
+
+    useEnterToAdvance(formRef, {
+        onFinalEnter: () => {
+            handleSubmit();
+        }
+    });
 
     // Fetch the real account_groups from the backend so we can resolve code → id
     const { data: groups = [] } = useQuery({
@@ -115,6 +123,7 @@ export function LedgerCreateForm() {
 
     return (
         <form
+            ref={formRef}
             className="tally-panel"
             onSubmit={handleSubmit}
             onKeyDown={handleFormKeyDown}

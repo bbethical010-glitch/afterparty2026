@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewState } from '../../providers/ViewStateProvider';
+import { useEnterToAdvance } from '../../hooks/useEnterToAdvance';
 
 /**
  * CompanySetupPanel — Tally-style company setup.
@@ -13,6 +14,11 @@ export function CompanySetupPanel() {
     const { popScreen } = useViewState();
     const businessId = user?.businessId;
     const nameRef = useRef(null);
+    const formRef = useRef(null);
+
+    useEnterToAdvance(formRef, {
+        onFinalEnter: () => saveMutation.mutate()
+    });
 
     const [name, setName] = useState('');
     const [fyStart, setFyStart] = useState('');
@@ -62,7 +68,7 @@ export function CompanySetupPanel() {
     }
 
     return (
-        <section className="tally-panel" onKeyDown={onKeyDown}>
+        <section ref={formRef} className="tally-panel" onKeyDown={onKeyDown}>
             <div className="tally-panel-header">Company Setup</div>
             <div className="p-2 grid gap-1 text-sm">
                 <label className="tally-field">

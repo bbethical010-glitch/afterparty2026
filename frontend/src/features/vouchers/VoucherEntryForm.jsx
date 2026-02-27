@@ -8,6 +8,7 @@ import { announceToScreenReader } from '../../hooks/useFocusUtilities';
 import { PrintModal } from '../../components/PrintModal';
 import { useViewState } from '../../providers/ViewStateProvider';
 import { registerKeyHandler } from '../../lib/KeyboardManager';
+import { useEnterToAdvance } from '../../hooks/useEnterToAdvance';
 
 const emptyLine = { accountId: '', entryType: 'DR', amount: '' };
 
@@ -41,10 +42,24 @@ export function VoucherEntryForm({ voucherId, vtype }) {
   const [reversalNumber, setReversalNumber] = useState('');
   const [reversalDate, setReversalDate] = useState(new Date().toISOString().slice(0, 10));
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+
   const voucherTypeRef = useRef(null);
   const voucherDateRef = useRef(null);
   const narrationRef = useRef(null);
   const firstLedgerRef = useRef(null);
+  const formRef = useRef(null);
+
+  useEnterToAdvance(formRef, {
+    onFinalEnter: () => {
+      // If we're on the last line and it's heavily unbalanced, add a new line.
+      // Else if balanced, we can save.
+      if (!totals.isBalanced && canEdit) {
+        addLine();
+      } else if (totals.isBalanced && canEdit) {
+        postNow();
+      }
+    }
+  });
 
   const isEditMode = Boolean(voucherId);
 
@@ -313,7 +328,7 @@ export function VoucherEntryForm({ voucherId, vtype }) {
 
   return (
     <>
-      <form className="boxed shadow-panel" onSubmit={postNow} onKeyDown={onFormKeyDown} role="region" aria-label="Voucher Entry">
+      <form ref={formRef} className="boxed shadow-panel" onSubmit={postNow} onKeyDown={onFormKeyDown} role="region" aria-label="Voucher Entry">
         <div className="bg-tally-header text-white px-3 py-2 text-sm font-semibold flex items-center justify-between">
           <span>{isEditMode ? `Voucher (${existingVoucher?.status || '...'})` : 'Voucher Entry'}</span>
           <span className={totals.isBalanced ? '' : 'text-red-200'}>
