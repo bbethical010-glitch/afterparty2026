@@ -31,8 +31,8 @@ WITH account_balances AS (
     ag.id AS group_id,
     ag.name AS group_name,
     ag.category,
-    (CASE WHEN a.opening_balance_type = 'DR' THEN a.opening_balance ELSE -a.opening_balance END)
-      + COALESCE(SUM(lp.debit - lp.credit), 0) AS closing_signed
+    (CASE WHEN a.opening_balance_type = 'DR' THEN a.opening_balance ELSE 0 END) + COALESCE(SUM(lp.debit), 0) AS total_dr,
+    (CASE WHEN a.opening_balance_type = 'CR' THEN a.opening_balance ELSE 0 END) + COALESCE(SUM(lp.credit), 0) AS total_cr
   FROM accounts a
   JOIN account_groups ag ON ag.id = a.account_group_id
   LEFT JOIN ledger_postings lp ON lp.account_id = a.id
@@ -58,8 +58,8 @@ reportsRouter.get('/trial-balance', async (req, res, next) => {
          group_id AS "groupId",
          group_name AS "groupName",
          category,
-         CASE WHEN closing_signed >= 0 THEN closing_signed ELSE 0 END AS debit,
-         CASE WHEN closing_signed < 0 THEN ABS(closing_signed) ELSE 0 END AS credit
+         CASE WHEN total_dr > total_cr THEN total_dr - total_cr ELSE 0 END AS debit,
+         CASE WHEN total_cr > total_dr THEN total_cr - total_dr ELSE 0 END AS credit
        FROM account_balances
        ORDER BY category, group_name, code`,
       [businessId, from || null, to || null]
@@ -175,17 +175,20 @@ reportsRouter.get('/balance-sheet', async (req, res, next) => {
       `${balanceCte}
        SELECT
          category,
-         COALESCE(SUM(closing_signed), 0) AS signed_total
+         COALESCE(SUM(
+           CASE WHEN category IN ('CURRENT_ASSET', 'FIXED_ASSET', 'EXPENSE') THEN total_dr - total_cr
+           ELSE total_cr - total_dr END
+         ), 0) AS category_balance
        FROM account_balances
        GROUP BY category`,
       [businessId, from || null, to || null]
     );
 
-    const byCategory = Object.fromEntries(result.rows.map((row) => [row.category, Number(row.signed_total)]));
+    const byCategory = Object.fromEntries(result.rows.map((row) => [row.category, Number(row.category_balance)]));
 
     const assets = (byCategory.CURRENT_ASSET || 0) + (byCategory.FIXED_ASSET || 0);
-    const liabilities = Math.abs(byCategory.LIABILITY || 0);
-    const equityBase = Math.abs(byCategory.EQUITY || 0);
+    const liabilities = byCategory.LIABILITY || 0;
+    const equityBase = byCategory.EQUITY || 0;
 
     const pnl = await pool.query(
       `SELECT

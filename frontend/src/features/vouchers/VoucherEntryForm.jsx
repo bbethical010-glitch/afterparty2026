@@ -10,19 +10,9 @@ import { useViewState } from '../../providers/ViewStateProvider';
 import { focusGraph } from '../../core/FocusGraph';
 import { gridEngine } from '../../core/GridEngine';
 import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { computeVoucherTotals, validateVoucher } from '../../domain/accounting/voucherService';
 
 const emptyLine = { accountId: '', entryType: 'DR', amount: '' };
-
-function computeTotals(entries) {
-  const debit = entries
-    .filter((line) => line.entryType === 'DR')
-    .reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
-  const credit = entries
-    .filter((line) => line.entryType === 'CR')
-    .reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
-  const difference = Number((debit - credit).toFixed(2));
-  return { debit, credit, difference, isBalanced: difference === 0 };
-}
 
 export function VoucherEntryForm({ voucherId, vtype }) {
   const { popScreen } = useViewState();
@@ -86,7 +76,7 @@ export function VoucherEntryForm({ voucherId, vtype }) {
   const isReversed = isEditMode && existingVoucher?.status === 'REVERSED';
   const isCancelled = isEditMode && existingVoucher?.status === 'CANCELLED';
 
-  const totals = useMemo(() => computeTotals(entries), [entries]);
+  const totals = useMemo(() => computeVoucherTotals(entries), [entries]);
 
   // Phase N: Initialize GridEngine and FocusGraph
   useEffect(() => {
@@ -261,23 +251,12 @@ export function VoucherEntryForm({ voucherId, vtype }) {
   });
 
   function validateLines() {
-    const validEntries = entries.filter((line) => line.accountId);
-
-    if (validEntries.length < 2) {
-      setLineError('At least 2 ledger lines required');
-      announceToScreenReader('Error: At least 2 ledger lines required');
+    const { isValid, error } = validateVoucher(entries);
+    if (!isValid) {
+      setLineError(error);
+      announceToScreenReader(`Error: ${error}`);
       return false;
     }
-
-    for (let i = 0; i < validEntries.length; i++) {
-      const line = validEntries[i];
-      if (!Number.isFinite(Number(line.amount)) || Number(line.amount) <= 0) {
-        setLineError(`Line ${i + 1} must have an amount greater than zero`);
-        announceToScreenReader(`Error: Line ${i + 1} must have an amount greater than zero`);
-        return false;
-      }
-    }
-
     setLineError('');
     return true;
   }
@@ -289,16 +268,6 @@ export function VoucherEntryForm({ voucherId, vtype }) {
   function addLine() {
     if (!canEdit) return;
     setEntries((prev) => [...prev, { ...emptyLine }]);
-  }
-
-  function autoBalanceToLastLine() {
-    if (!canEdit || entries.length === 0) return;
-    const diff = totals.difference;
-    if (diff === 0) return;
-    const idx = entries.length - 1;
-    const entryType = diff > 0 ? 'CR' : 'DR';
-    const amount = Math.abs(diff).toFixed(2);
-    setEntries((prev) => prev.map((line, i) => (i === idx ? { ...line, entryType, amount } : line)));
   }
 
   function saveDraft() {
@@ -519,7 +488,6 @@ export function VoucherEntryForm({ voucherId, vtype }) {
           {canEdit && (
             <>
               <button type="button" onClick={addLine} className="focusable boxed px-3 py-1">⌥A Add Line</button>
-              <button type="button" onClick={autoBalanceToLastLine} className="focusable boxed px-3 py-1">Auto Balance</button>
               <button type="button" onClick={saveDraft} className="focusable boxed px-3 py-1">Save Draft</button>
               <button
                 type="submit"

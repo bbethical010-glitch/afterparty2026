@@ -35,8 +35,12 @@ resetRouter.post('/', async (req, res) => {
         // Wipe accounting data in dependency order
         await pool.query('BEGIN');
         try {
+            await pool.query('DELETE FROM ledger_postings WHERE business_id = $1', [businessId]);
+            await pool.query('DELETE FROM transaction_entries WHERE transaction_id IN (SELECT id FROM transactions WHERE business_id = $1)', [businessId]);
             await pool.query('DELETE FROM transactions WHERE business_id = $1', [businessId]);
+            await pool.query('DELETE FROM voucher_lines WHERE voucher_id IN (SELECT id FROM vouchers WHERE business_id = $1)', [businessId]);
             await pool.query('DELETE FROM vouchers WHERE business_id = $1', [businessId]);
+            await pool.query('DELETE FROM financial_years WHERE business_id = $1', [businessId]);
             await pool.query('DELETE FROM accounts WHERE business_id = $1 AND is_system = FALSE', [businessId]);
             await pool.query('DELETE FROM account_groups WHERE business_id = $1 AND is_system = FALSE', [businessId]);
             await pool.query('COMMIT');

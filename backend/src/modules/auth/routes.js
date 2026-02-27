@@ -89,20 +89,6 @@ async function bootstrapBusinessDefaults(client, businessId) {
     [businessId]
   );
 
-  await client.query(
-    `INSERT INTO accounts (business_id, account_group_id, code, name, normal_balance, opening_balance, opening_balance_type, is_system)
-     VALUES
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'CA-CASH'), 'A-CASH', 'Cash', 'DR', 0, 'DR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'CA-BANK'), 'A-BANK', 'Bank', 'DR', 0, 'DR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'CA-AR'), 'A-AR', 'Accounts Receivable', 'DR', 0, 'DR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'LI-AP'), 'L-AP', 'Accounts Payable', 'CR', 0, 'CR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'IN-SALES'), 'I-SALES', 'Sales', 'CR', 0, 'CR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'EX-PUR'), 'E-PUR', 'Purchases', 'DR', 0, 'DR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'EX-IND'), 'E-RENT', 'Rent Expense', 'DR', 0, 'DR', TRUE),
-      ($1, (SELECT id FROM account_groups WHERE business_id = $1 AND code = 'EQ'), 'EQ-CAP', 'Capital Account', 'CR', 0, 'CR', TRUE)
-     ON CONFLICT (business_id, code) DO NOTHING`,
-    [businessId]
-  );
 }
 
 authRouter.post('/login', async (req, res, next) => {
@@ -141,7 +127,7 @@ authRouter.post('/login', async (req, res, next) => {
       throw httpError(401, 'Invalid username or password');
     }
 
-    await pool.query(`UPDATE app_users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
+    await pool.query(`UPDATE app_users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => { });
 
     const token = createAuthToken(
       {
@@ -296,7 +282,7 @@ authRouter.post('/signup', async (req, res, next) => {
       }
     });
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     if (error instanceof z.ZodError) {
       return next(httpError(400, 'Invalid signup payload', error.issues));
     }
