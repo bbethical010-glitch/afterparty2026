@@ -52,6 +52,16 @@ class InputEngine {
             commandToDispatch = COMMANDS.VIEW_POP;
         } else if (event.key === 'Enter') {
             commandToDispatch = COMMANDS.FOCUS_NEXT;
+        } else if (event.key === 'ArrowDown') {
+            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+                event.preventDefault(); // Prevent page scroll
+                commandToDispatch = COMMANDS.GRID_DOWN;
+            }
+        } else if (event.key === 'ArrowUp') {
+            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+                event.preventDefault(); // Prevent page scroll
+                commandToDispatch = COMMANDS.GRID_UP;
+            }
         }
 
         if (commandToDispatch) {
