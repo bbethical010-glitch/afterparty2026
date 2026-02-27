@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { focusGraph } from '../core/FocusGraph';
 import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
+import { commandBus, COMMANDS } from '../core/CommandBus';
 
 /**
  * LoginPage — Tally-style sign-in / sign-up.
@@ -69,17 +71,50 @@ export function LoginPage() {
     }
   }
 
-  function onTabKeyDown(e) {
-    if (e.key === 'Escape') {
-      setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
+  useEffect(() => {
+    const unsub = commandBus.subscribe(COMMANDS.VIEW_POP, () => {
+      setMode((prev) => (prev === 'signin' ? 'signup' : 'signin'));
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    focusGraph.init('login-page');
+
+    if (mode === 'signin') {
+      focusGraph.registerNode('btnSignin', { next: 'btnSignup', prev: 'loginBtn' });
+      focusGraph.registerNode('btnSignup', { next: 'loginUser', prev: 'btnSignin' });
+
+      focusGraph.registerNode('loginUser', { next: 'loginPass', prev: 'btnSignup' });
+      focusGraph.registerNode('loginPass', { next: 'loginBtn', prev: 'loginUser' });
+      focusGraph.registerNode('loginBtn', {
+        next: 'btnSignin',
+        prev: 'loginPass'
+      });
+
+      // Initially focus first input
+      setTimeout(() => focusGraph.setCurrentNode('loginUser'), 50);
+    } else {
+      focusGraph.registerNode('btnSignin', { next: 'btnSignup', prev: 'regBtn' });
+      focusGraph.registerNode('btnSignup', { next: 'regCompany', prev: 'btnSignin' });
+
+      focusGraph.registerNode('regCompany', { next: 'regUser', prev: 'btnSignup' });
+      focusGraph.registerNode('regUser', { next: 'regName', prev: 'regCompany' });
+      focusGraph.registerNode('regName', { next: 'regPass', prev: 'regUser' });
+      focusGraph.registerNode('regPass', { next: 'regBtn', prev: 'regName' });
+      focusGraph.registerNode('regBtn', {
+        next: 'btnSignin',
+        prev: 'regPass'
+      });
+
+      setTimeout(() => focusGraph.setCurrentNode('regCompany'), 50);
     }
-  }
+
+    return () => focusGraph.destroy();
+  }, [mode]);
 
   return (
-    <div
-      className="min-h-screen bg-tally-background text-tally-text flex items-center justify-center p-4"
-      onKeyDown={onTabKeyDown}
-    >
+    <div className="min-h-screen bg-tally-background text-tally-text flex items-center justify-center p-4">
       <div className="tally-panel w-full max-w-2xl">
         {/* App header */}
         <div className="tally-panel-header">
@@ -90,6 +125,7 @@ export function LoginPage() {
         {/* Mode tabs */}
         <div className="p-2 border-b border-tally-panelBorder flex gap-2 text-sm">
           <button
+            id="btnSignin"
             type="button"
             className={`focusable border px-3 py-1 ${mode === 'signin' ? 'bg-tally-header text-white border-tally-panelBorder' : 'tally-btn'}`}
             onClick={() => setMode('signin')}
@@ -97,6 +133,7 @@ export function LoginPage() {
             Sign In
           </button>
           <button
+            id="btnSignup"
             type="button"
             className={`focusable border px-3 py-1 ${mode === 'signup' ? 'bg-tally-header text-white border-tally-panelBorder' : 'tally-btn'}`}
             onClick={() => setMode('signup')}
@@ -111,6 +148,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Username</span>
               <input
+                id="loginUser"
                 autoFocus
                 className="tally-input"
                 value={username}
@@ -121,6 +159,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Password</span>
               <input
+                id="loginPass"
                 type="password"
                 className="tally-input"
                 value={password}
@@ -129,6 +168,7 @@ export function LoginPage() {
               />
             </label>
             <button
+              id="loginBtn"
               type="submit"
               disabled={isSubmitting}
               className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-1 disabled:opacity-60"
@@ -142,6 +182,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Company Name</span>
               <input
+                id="regCompany"
                 autoFocus
                 className="tally-input"
                 value={registerForm.companyName}
@@ -152,6 +193,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Username</span>
               <input
+                id="regUser"
                 className="tally-input"
                 value={registerForm.username}
                 onChange={(e) => onRegisterChange('username', e.target.value)}
@@ -161,6 +203,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Display Name</span>
               <input
+                id="regName"
                 className="tally-input"
                 value={registerForm.displayName}
                 onChange={(e) => onRegisterChange('displayName', e.target.value)}
@@ -170,6 +213,7 @@ export function LoginPage() {
             <label className="tally-field">
               <span className="tally-field-label">Password</span>
               <input
+                id="regPass"
                 type="password"
                 className="tally-input"
                 value={registerForm.password}
@@ -179,6 +223,7 @@ export function LoginPage() {
               />
             </label>
             <button
+              id="regBtn"
               type="submit"
               disabled={isRegistering}
               className="focusable bg-tally-header text-white border border-tally-panelBorder px-3 py-1 disabled:opacity-60"

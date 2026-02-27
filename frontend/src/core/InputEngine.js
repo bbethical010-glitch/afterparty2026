@@ -39,8 +39,10 @@ class InputEngine {
         if (isCmdOrCtrl && event.key === 'Enter') {
             commandToDispatch = COMMANDS.FORM_SAVE;
         } else if (isCmdOrCtrl && event.key.toLowerCase() === 'r') {
+            event.preventDefault();
             commandToDispatch = COMMANDS.RESET_COMPANY;
         } else if (isCmdOrCtrl && event.key.toLowerCase() === 'p') {
+            event.preventDefault();
             commandToDispatch = COMMANDS.PRINT;
         } else if (event.key === 'F12') {
             commandToDispatch = COMMANDS.OPEN_CONFIG;

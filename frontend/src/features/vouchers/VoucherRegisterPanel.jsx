@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { VOUCHER_STATUSES, VOUCHER_TYPES } from '../../lib/constants';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
+import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { listEngine } from '../../core/ListEngine';
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -25,6 +26,8 @@ export function VoucherRegisterPanel() {
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const searchRef = useRef(null);
+
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const limit = 20;
   const offset = (page - 1) * limit;
@@ -47,18 +50,48 @@ export function VoucherRegisterPanel() {
   const total = data?.page?.total || 0;
   const pageCount = Math.max(Math.ceil(total / limit), 1);
 
-  const { activeIndex, containerProps } = useFocusList(rows.length, {
-    onSelect: (idx) => {
-      if (rows[idx]) pushScreen(SCREENS.VOUCHER_EDIT, { voucherId: rows[idx].id });
-    },
-    onBack: () => popScreen(),
-  });
+  useEffect(() => {
+    const listMap = rows.map((voucher, idx) => ({
+      id: `voucher-item-${idx}`,
+      onSelect: () => {
+        commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_EDIT, params: { voucherId: voucher.id } });
+      }
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.VOUCHER_REGISTER, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [rows, activeIndex]);
 
   function onFilterKeyDown(e) {
-    if (e.key === 'Escape') { e.preventDefault(); containerProps.ref.current?.focus(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      document.getElementById(`voucher-item-${activeIndex}`)?.focus();
+    }
   }
+
+  // Hotkey N for new voucher from register
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      if (!isInput && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_NEW });
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   return (
     <section className="tally-panel">
@@ -84,7 +117,7 @@ export function VoucherRegisterPanel() {
         <input type="date" className="tally-input" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
       </div>
 
-      <div {...containerProps} className="max-h-[calc(100vh-180px)] overflow-auto">
+      <div className="max-h-[calc(100vh-180px)] overflow-auto">
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr>
@@ -100,9 +133,9 @@ export function VoucherRegisterPanel() {
             {rows.map((voucher, idx) => (
               <tr
                 key={voucher.id}
-                data-focus-index={idx}
+                id={`voucher-item-${idx}`}
                 className={idx === activeIndex ? 'tally-row-active' : ''}
-                onClick={() => pushScreen(SCREENS.VOUCHER_EDIT, { voucherId: voucher.id })}
+                onClick={() => commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_EDIT, params: { voucherId: voucher.id } })}
               >
                 <td>{formatDate(voucher.voucherDate)}</td>
                 <td>{voucher.voucherNumber}</td>

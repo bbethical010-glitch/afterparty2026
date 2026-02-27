@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../auth/AuthContext';
 import { api } from '../../lib/api';
-import { useViewState } from '../../providers/ViewStateProvider';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
-import { useEffect, useRef, useState } from 'react';
+import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
+import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { listEngine } from '../../core/ListEngine';
+import { useEffect, useState } from 'react';
 
 /**
  * UsersPanel — list + create users. Arrow nav, Enter to view.
@@ -14,22 +15,41 @@ export function UsersPanel() {
   const businessId = user?.businessId;
   const queryClient = useQueryClient();
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const { data: users = [] } = useQuery({
     queryKey: ['users', businessId],
     enabled: Boolean(businessId),
     queryFn: () => api.get('/auth/users'),
   });
 
-  const { activeIndex, containerProps } = useFocusList(users.length, {
-    onBack: () => popScreen(),
-  });
+  useEffect(() => {
+    const listMap = users.map((u, idx) => ({
+      id: `users-item-${idx}`,
+      onSelect: () => {
+        // No specific action on user select for now
+      }
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.USERS, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [users]);
 
   return (
     <section className="tally-panel">
       <div className="tally-panel-header">Users</div>
-      <div {...containerProps}>
+      <div>
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr><th>Username</th><th>Display Name</th><th>Role</th></tr>
@@ -38,7 +58,7 @@ export function UsersPanel() {
             {users.map((u, idx) => (
               <tr
                 key={u.id}
-                data-focus-index={idx}
+                id={`users-item-${idx}`}
                 className={idx === activeIndex ? 'tally-row-active' : ''}
               >
                 <td>{u.username}</td>

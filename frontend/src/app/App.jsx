@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { LoginPage } from '../pages/LoginPage';
 import { TallyShell } from './TallyShell';
 import { ViewStateProvider } from '../providers/ViewStateProvider';
-import { installGlobalKeyListener } from '../lib/KeyboardManager';
+
 import { inputEngine } from '../core/InputEngine';
 
 /**
@@ -39,11 +39,10 @@ export function App() {
   // Install global keyboard listener once
   useEffect(() => {
     inputEngine.init();
-    const cleanupOld = installGlobalKeyListener();
+    // Removed legacy global keyboard listener
 
     return () => {
       inputEngine.destroy();
-      cleanupOld();
     };
   }, []);
 

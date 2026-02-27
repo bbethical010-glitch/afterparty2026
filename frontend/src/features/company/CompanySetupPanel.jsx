@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewState } from '../../providers/ViewStateProvider';
-import { useEnterToAdvance } from '../../hooks/useEnterToAdvance';
+import { focusGraph } from '../../core/FocusGraph';
 
 /**
  * CompanySetupPanel — Tally-style company setup.
@@ -13,12 +13,6 @@ export function CompanySetupPanel() {
     const { user } = useAuth();
     const { popScreen } = useViewState();
     const businessId = user?.businessId;
-    const nameRef = useRef(null);
-    const formRef = useRef(null);
-
-    useEnterToAdvance(formRef, {
-        onFinalEnter: () => saveMutation.mutate()
-    });
 
     const [name, setName] = useState('');
     const [fyStart, setFyStart] = useState('');
@@ -41,7 +35,21 @@ export function CompanySetupPanel() {
     }, [company]);
 
     useEffect(() => {
-        requestAnimationFrame(() => nameRef.current?.focus());
+        focusGraph.init('company-setup-panel');
+        focusGraph.registerNode('companyName', { next: 'companyFy', prev: null });
+        focusGraph.registerNode('companyFy', { next: 'companyCurrency', prev: 'companyName' });
+        focusGraph.registerNode('companyCurrency', { next: 'companyAddress', prev: 'companyFy' });
+        focusGraph.registerNode('companyAddress', {
+            next: () => {
+                saveMutation.mutate();
+                return null;
+            },
+            prev: 'companyCurrency'
+        });
+
+        setTimeout(() => focusGraph.setCurrentNode('companyName'), 50);
+
+        return () => focusGraph.destroy();
     }, []);
 
     const queryClient = useQueryClient();
@@ -58,34 +66,25 @@ export function CompanySetupPanel() {
         },
     });
 
-    function onKeyDown(e) {
-        if (e.key === 'Escape') { e.preventDefault(); popScreen(); return; }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            e.preventDefault();
-            saveMutation.mutate();
-            return;
-        }
-    }
-
     return (
-        <section ref={formRef} className="tally-panel" onKeyDown={onKeyDown}>
+        <section className="tally-panel">
             <div className="tally-panel-header">Company Setup</div>
             <div className="p-2 grid gap-1 text-sm">
                 <label className="tally-field">
                     <span className="tally-field-label">Company Name</span>
-                    <input ref={nameRef} className="tally-input" value={name} onChange={(e) => setName(e.target.value)} />
+                    <input id="companyName" className="tally-input" value={name} onChange={(e) => setName(e.target.value)} />
                 </label>
                 <label className="tally-field">
                     <span className="tally-field-label">Financial Year Start</span>
-                    <input type="date" className="tally-input" value={fyStart} onChange={(e) => setFyStart(e.target.value)} />
+                    <input id="companyFy" type="date" className="tally-input" value={fyStart} onChange={(e) => setFyStart(e.target.value)} />
                 </label>
                 <label className="tally-field">
                     <span className="tally-field-label">Base Currency</span>
-                    <input className="tally-input" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+                    <input id="companyCurrency" className="tally-input" value={currency} onChange={(e) => setCurrency(e.target.value)} />
                 </label>
                 <label className="tally-field">
                     <span className="tally-field-label">Address</span>
-                    <textarea className="tally-input" rows={3} value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <textarea id="companyAddress" className="tally-input" rows={3} value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
                 <div className="tally-status-bar">
                     Ctrl+Enter: Accept · Esc: Back

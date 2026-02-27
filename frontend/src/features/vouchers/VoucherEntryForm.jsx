@@ -7,7 +7,6 @@ import { LedgerSearch } from '../../components/LedgerSearch';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
 import { PrintModal } from '../../components/PrintModal';
 import { useViewState } from '../../providers/ViewStateProvider';
-import { registerKeyHandler } from '../../lib/KeyboardManager';
 import { focusGraph } from '../../core/FocusGraph';
 import { gridEngine } from '../../core/GridEngine';
 
@@ -309,30 +308,24 @@ export function VoucherEntryForm({ voucherId, vtype }) {
   }
 
   useEffect(() => {
-    return registerKeyHandler(20, (event, keyString, isInput) => {
-      if (keyString === 'ctrl+enter') {
-        event.preventDefault();
-        postNow(event);
-        return true;
+    const unsubPrint = commandBus.subscribe(COMMANDS.PRINT, () => {
+      if (isPosted) {
+        setIsPrintOpen(true);
+      } else {
+        announceToScreenReader('Print is only available for posted vouchers');
       }
-      if (keyString === 'ctrl+d' && isInput) {
-        event.preventDefault();
-        addLine();
-        return true;
-      }
-      if (keyString === 'alt+r') {
-        event.preventDefault();
-        announceToScreenReader('Repeat last voucher not implemented');
-        return true;
-      }
-      if (keyString === 'f12') {
-        event.preventDefault();
-        announceToScreenReader('Voucher configuration not implemented');
-        return true;
-      }
-      return false;
     });
-  }, [postNow, addLine]);
+
+    const unsubSave = commandBus.subscribe(COMMANDS.FORM_SAVE, (payload) => {
+      if (payload?.originalEvent) payload.originalEvent.preventDefault();
+      postNow(payload?.originalEvent);
+    });
+
+    return () => {
+      unsubPrint();
+      unsubSave();
+    };
+  }, [isPosted, postNow]);
 
   function onFormKeyDown(event) {
     if (event.key === 'Escape') {
@@ -341,15 +334,20 @@ export function VoucherEntryForm({ voucherId, vtype }) {
       return;
     }
 
-    // Ctrl+P / Cmd+P → Print (for POSTED vouchers)
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
       event.preventDefault();
-      if (isPosted) {
-        setIsPrintOpen(true);
-      } else {
-        announceToScreenReader('Print is only available for posted vouchers');
-      }
+      addLine();
       return;
+    }
+
+    if (event.altKey && event.key.toLowerCase() === 'r') {
+      if (isPosted) {
+        // Handled below for reverse
+      } else {
+        event.preventDefault();
+        announceToScreenReader('Repeat last voucher not implemented');
+        return;
+      }
     }
 
     if (event.altKey && event.key.toLowerCase() === 'a') {

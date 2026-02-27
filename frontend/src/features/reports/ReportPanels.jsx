@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
+import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { listEngine } from '../../core/ListEngine';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,6 +24,8 @@ export function TrialBalancePanel() {
   const [drillStack, setDrillStack] = useState([]); // each: { category, lines }
   const level = drillStack.length; // 0 = categories, 1 = lines within category
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const { data } = useQuery({
     queryKey: ['trial-balance', businessId, from, to],
     enabled: Boolean(businessId),
@@ -39,6 +42,7 @@ export function TrialBalancePanel() {
       debit: grouped[cat]?.debit,
       credit: grouped[cat]?.credit,
       isCategory: true,
+      categoryName: cat
     }))
     : (drillStack[0]?.lines || []).map((line) => ({
       label: `${line.code} — ${line.name}`,
@@ -48,24 +52,46 @@ export function TrialBalancePanel() {
       groupName: line.groupName,
     }));
 
-  const { activeIndex, containerProps } = useFocusList(displayItems.length, {
-    onSelect: (idx) => {
-      const item = displayItems[idx];
-      if (level === 0 && item.isCategory) {
-        // Drill into category
-        setDrillStack([{ category: item.label, lines: grouped[item.label]?.lines || [] }]);
-      } else if (level === 1 && item.accountId) {
-        // Drill into ledger
-        pushScreen(SCREENS.LEDGER_LIST, { accountId: item.accountId });
-      }
-    },
-    onBack: () => {
-      if (level > 0) setDrillStack([]);
-      else popScreen();
-    },
-  });
+  useEffect(() => {
+    setActiveIndex(0); // reset focus on level change
+  }, [level]);
 
-  useAutoFocus(containerProps.ref);
+  useEffect(() => {
+    const listMap = displayItems.map((item, idx) => ({
+      id: `tb-item-${idx}`,
+      onSelect: () => {
+        if (level === 0 && item.isCategory) {
+          // Drill down
+          setDrillStack([{ category: item.categoryName, lines: grouped[item.categoryName]?.lines || [] }]);
+        } else if (level === 1 && item.accountId) {
+          // Open ledger
+          commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.LEDGER_LIST, params: { accountId: item.accountId } });
+        }
+      }
+    }));
+
+    listEngine.init(SCREENS.TRIAL_BALANCE, {
+      onBack: () => {
+        if (level > 0) {
+          setDrillStack(prev => prev.slice(0, -1)); // pop internal drilldown instead of view stack
+        } else {
+          commandBus.dispatch(COMMANDS.VIEW_POP);
+        }
+      }
+    });
+
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [displayItems, level, activeIndex, grouped]);
+
 
   const breadcrumb = level === 0 ? 'Trial Balance' : `Trial Balance › ${drillStack[0]?.category}`;
 
@@ -83,7 +109,7 @@ export function TrialBalancePanel() {
         </div>
       )}
 
-      <div {...containerProps} className="max-h-[calc(100vh-200px)] overflow-auto" style={{ outline: 'none' }}>
+      <div className="max-h-[calc(100vh-200px)] overflow-auto" style={{ outline: 'none' }}>
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr>
@@ -97,8 +123,15 @@ export function TrialBalancePanel() {
             {displayItems.map((item, idx) => (
               <tr
                 key={idx}
-                data-focus-index={idx}
+                id={`tb-item-${idx}`}
                 className={`${idx === activeIndex ? 'tally-row-active' : ''} ${item.isCategory ? 'font-bold' : ''}`}
+                onClick={() => {
+                  if (level === 0 && item.isCategory) {
+                    setDrillStack([{ category: item.categoryName, lines: grouped[item.categoryName]?.lines || [] }]);
+                  } else if (level === 1 && item.accountId) {
+                    commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.LEDGER_LIST, params: { accountId: item.accountId } });
+                  }
+                }}
               >
                 <td className="px-2 py-0.5">{item.label}</td>
                 {level === 1 && <td className="px-2 py-0.5 text-xs opacity-70">{item.groupName || ''}</td>}
@@ -131,6 +164,8 @@ export function ProfitLossPanel() {
   const [from, setFrom] = useState(today.slice(0, 4) + '-04-01');
   const [to, setTo] = useState(today);
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const { data } = useQuery({
     queryKey: ['profit-loss', businessId, from, to],
     enabled: Boolean(businessId),
@@ -145,11 +180,26 @@ export function ProfitLossPanel() {
     { label: 'Net Profit', value: data?.netProfit, bold: true },
   ];
 
-  const { activeIndex, containerProps } = useFocusList(rows.length, {
-    onBack: () => popScreen(),
-  });
+  useEffect(() => {
+    const listMap = rows.map((row, idx) => ({
+      id: `pl-item-${idx}`,
+      onSelect: () => { }
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.PROFIT_LOSS, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [rows, activeIndex]);
 
   return (
     <section className="tally-panel">
@@ -158,7 +208,7 @@ export function ProfitLossPanel() {
         <input type="date" className="tally-input" value={from} onChange={(e) => setFrom(e.target.value)} />
         <input type="date" className="tally-input" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
-      <div {...containerProps} style={{ outline: 'none' }}>
+      <div style={{ outline: 'none' }}>
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr><th className="text-left">Particulars</th><th className="text-right">Amount</th></tr>
@@ -167,7 +217,7 @@ export function ProfitLossPanel() {
             {rows.map((row, idx) => (
               <tr
                 key={idx}
-                data-focus-index={idx}
+                id={`pl-item-${idx}`}
                 className={`${idx === activeIndex ? 'tally-row-active' : ''} ${row.bold ? 'font-bold' : ''}`}
               >
                 <td className="px-2 py-0.5">{row.label}</td>
@@ -192,6 +242,8 @@ export function BalanceSheetPanel() {
   const [from, setFrom] = useState(today.slice(0, 4) + '-04-01');
   const [to, setTo] = useState(today);
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const { data } = useQuery({
     queryKey: ['balance-sheet', businessId, from, to],
     enabled: Boolean(businessId),
@@ -206,11 +258,26 @@ export function BalanceSheetPanel() {
     { label: 'Liabilities + Equity', value: data?.liabilitiesAndEquity, bold: true },
   ];
 
-  const { activeIndex, containerProps } = useFocusList(rows.length, {
-    onBack: () => popScreen(),
-  });
+  useEffect(() => {
+    const listMap = rows.map((row, idx) => ({
+      id: `bs-item-${idx}`,
+      onSelect: () => { }
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.BALANCE_SHEET, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [rows, activeIndex]);
 
   return (
     <section className="tally-panel">
@@ -219,7 +286,7 @@ export function BalanceSheetPanel() {
         <input type="date" className="tally-input" value={from} onChange={(e) => setFrom(e.target.value)} />
         <input type="date" className="tally-input" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
-      <div {...containerProps} style={{ outline: 'none' }}>
+      <div style={{ outline: 'none' }}>
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr><th className="text-left">Particulars</th><th className="text-right">Amount</th></tr>
@@ -228,7 +295,7 @@ export function BalanceSheetPanel() {
             {rows.map((row, idx) => (
               <tr
                 key={idx}
-                data-focus-index={idx}
+                id={`bs-item-${idx}`}
                 className={`${idx === activeIndex ? 'tally-row-active' : ''} ${row.bold ? 'font-bold' : ''}`}
               >
                 <td className="px-2 py-0.5">{row.label}</td>

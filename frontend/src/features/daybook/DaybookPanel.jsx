@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { VOUCHER_STATUSES, VOUCHER_TYPES } from '../../lib/constants';
 import { useAuth } from '../../auth/AuthContext';
-import { useViewState } from '../../providers/ViewStateProvider';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
+import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
+import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { listEngine } from '../../core/ListEngine';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -20,6 +21,8 @@ export function DaybookPanel() {
   const [voucherType, setVoucherType] = useState('');
   const [status, setStatus] = useState('');
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const { data = [] } = useQuery({
     queryKey: ['daybook', businessId, { from, to, voucherType, status }],
     enabled: Boolean(businessId),
@@ -31,11 +34,29 @@ export function DaybookPanel() {
     },
   });
 
-  const { activeIndex, containerProps } = useFocusList(data.length, {
-    onBack: () => popScreen(),
-  });
+  useEffect(() => {
+    const listMap = data.map((line, idx) => ({
+      id: `daybook-item-${idx}`,
+      onSelect: () => {
+        // Expand/Edit could go here
+        commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_EDIT, params: { voucherId: line.id } });
+      }
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.DAYBOOK, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [data, activeIndex]);
 
   return (
     <section className="tally-panel">
@@ -54,7 +75,7 @@ export function DaybookPanel() {
         </select>
       </div>
 
-      <div {...containerProps} className="max-h-[calc(100vh-180px)] overflow-auto">
+      <div className="max-h-[calc(100vh-180px)] overflow-auto">
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr><th>Date</th><th>Type</th><th>No.</th><th>Status</th><th>Narration</th><th>Debit</th><th>Credit</th></tr>
@@ -63,7 +84,7 @@ export function DaybookPanel() {
             {data.map((line, idx) => (
               <tr
                 key={line.id}
-                data-focus-index={idx}
+                id={`daybook-item-${idx}`}
                 className={idx === activeIndex ? 'tally-row-active' : ''}
               >
                 <td>{new Date(line.voucherDate).toLocaleDateString('en-IN')}</td>
@@ -81,7 +102,7 @@ export function DaybookPanel() {
           </tbody>
         </table>
       </div>
-      <div className="tally-status-bar">↑↓ Navigate · Esc Back</div>
+      <div className="tally-status-bar">↑↓ Navigate · Enter Open · Esc Back</div>
     </section>
   );
 }

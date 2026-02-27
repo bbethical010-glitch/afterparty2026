@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { focusGraph } from '../../core/FocusGraph';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useViewState } from '../../providers/ViewStateProvider';
@@ -8,14 +9,28 @@ import { useViewState } from '../../providers/ViewStateProvider';
  */
 export function ChangePasswordPanel() {
     const { popScreen } = useViewState();
-    const currentRef = useRef(null);
     const [current, setCurrent] = useState('');
     const [newPass, setNewPass] = useState('');
     const [confirm, setConfirm] = useState('');
 
     useEffect(() => {
-        requestAnimationFrame(() => currentRef.current?.focus());
-    }, []);
+        focusGraph.init('change-password-panel');
+        focusGraph.registerNode('currentPass', { next: 'newPass', prev: null });
+        focusGraph.registerNode('newPass', { next: 'confirmPass', prev: 'currentPass' });
+        focusGraph.registerNode('confirmPass', {
+            next: () => {
+                if (newPass === confirm && newPass.length > 0) {
+                    mutation.mutate();
+                }
+                return null;
+            },
+            prev: 'newPass'
+        });
+
+        setTimeout(() => focusGraph.setCurrentNode('currentPass'), 50);
+
+        return () => focusGraph.destroy();
+    }, [newPass, confirm]);
 
     const mutation = useMutation({
         mutationFn: () => api.post('/auth/change-password', {
@@ -25,30 +40,21 @@ export function ChangePasswordPanel() {
         onSuccess: () => popScreen(),
     });
 
-    function onKeyDown(e) {
-        if (e.key === 'Escape') { e.preventDefault(); popScreen(); }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            e.preventDefault();
-            if (newPass !== confirm) return;
-            mutation.mutate();
-        }
-    }
-
     return (
-        <section className="tally-panel" onKeyDown={onKeyDown}>
+        <section className="tally-panel">
             <div className="tally-panel-header">Change Password</div>
             <div className="p-2 grid gap-1 text-sm">
                 <label className="tally-field">
                     <span className="tally-field-label">Current Password</span>
-                    <input ref={currentRef} type="password" className="tally-input" value={current} onChange={(e) => setCurrent(e.target.value)} />
+                    <input id="currentPass" type="password" className="tally-input" value={current} onChange={(e) => setCurrent(e.target.value)} />
                 </label>
                 <label className="tally-field">
                     <span className="tally-field-label">New Password</span>
-                    <input type="password" className="tally-input" value={newPass} onChange={(e) => setNewPass(e.target.value)} />
+                    <input id="newPass" type="password" className="tally-input" value={newPass} onChange={(e) => setNewPass(e.target.value)} />
                 </label>
                 <label className="tally-field">
                     <span className="tally-field-label">Confirm New Password</span>
-                    <input type="password" className="tally-input" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                    <input id="confirmPass" type="password" className="tally-input" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </label>
                 {newPass && confirm && newPass !== confirm && (
                     <span className="text-tally-warning text-xs">Passwords do not match</span>

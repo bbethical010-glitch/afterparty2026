@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { focusGraph } from '../core/FocusGraph';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -25,9 +26,22 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
     useEffect(() => {
         if (open) {
             setConfirmText('');
-            requestAnimationFrame(() => inputRef.current?.focus());
+            focusGraph.init('reset-modal');
+            focusGraph.registerNode('resetInput', {
+                next: () => {
+                    // Enter to submit
+                    if (confirmText === companyName) {
+                        resetMutation.mutate();
+                    }
+                    return null;
+                },
+                prev: null
+            });
+            setTimeout(() => focusGraph.setCurrentNode('resetInput'), 50);
+        } else {
+            focusGraph.destroy();
         }
-    }, [open]);
+    }, [open, confirmText, companyName]);
 
     const resetMutation = useMutation({
         mutationFn: () => api.post('/reset-company', { confirmationName: confirmText }),
@@ -37,13 +51,7 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
         },
     });
 
-    function handleKeyDown(e) {
-        if (e.key === 'Escape') { e.preventDefault(); onClose(); }
-        if (e.key === 'Enter' && confirmText === companyName) {
-            e.preventDefault();
-            resetMutation.mutate();
-        }
-    }
+
 
     if (!open) return null;
 
@@ -51,7 +59,7 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
 
     return (
         <div className="command-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className="tally-panel w-96" onKeyDown={handleKeyDown}>
+            <div className="tally-panel w-96">
                 <div className="tally-panel-header text-tally-warning">⚠ Reset Company Data</div>
                 <div className="p-2 grid gap-2 text-sm">
                     <p>This will permanently delete all:</p>
@@ -64,7 +72,7 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
                     <p>Your user account and company profile will be preserved.</p>
                     <p className="font-bold">Type <span className="text-tally-accent">"{companyName}"</span> to confirm:</p>
                     <input
-                        ref={inputRef}
+                        id="resetInput"
                         className="tally-input"
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}

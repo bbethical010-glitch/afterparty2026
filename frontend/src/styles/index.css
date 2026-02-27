@@ -234,6 +234,7 @@ body.keyboard-first-mode textarea {
 
 .shadow-panel {
   /* No shadows — flat design */
+  box-shadow: none;
 }
 
 /* ── Print ── */

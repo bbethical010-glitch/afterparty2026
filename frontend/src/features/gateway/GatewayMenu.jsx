@@ -5,8 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
 import { commandBus, COMMANDS } from '../../core/CommandBus';
 import { getGatewaySections, VOUCHER_QUICK_ACTIONS } from '../../lib/navigation';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
-import { registerKeyHandler, matchesBinding } from '../../lib/KeyboardManager';
+import { listEngine } from '../../core/ListEngine';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -20,8 +19,10 @@ export function GatewayMenu() {
   const { current } = useViewState();
   const { user } = useAuth();
   const businessId = user?.businessId;
-  const canManageUsers = user?.role === 'OWNER';
-  const containerRef = useRef(null);
+  const userRole = user?.role;
+  const canManageUsers = userRole === 'OWNER';
+
+  const [activeIndex, setActiveIndex] = useState(() => current.focusIndex || 0);
 
   const gatewaySections = useMemo(() => getGatewaySections(canManageUsers), [canManageUsers]);
 
@@ -57,21 +58,41 @@ export function GatewayMenu() {
   function navigateItem(item) {
     const screen = pathToScreen[item.path];
     if (screen) {
-      commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen });
+      // Persist focus state in viewStack
+      commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen, focusIndex: activeIndex });
     }
   }
 
-  const { activeIndex, setActiveIndex, containerProps } = useFocusList(selectableItems.length, {
-    initialIndex: current.focusIndex || 0,
-    onSelect: (idx) => navigateItem(selectableItems[idx]),
-  });
+  // Effect: Sync local activeIndex with ListEngine focus traversal
+  useEffect(() => {
+    // Generate navigation map for ListEngine
+    const listMap = selectableItems.map((item, idx) => ({
+      id: `gateway-item-${idx}`,
+      onSelect: () => navigateItem(item)
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.GATEWAY, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    // Patch ListEngine's focus tracker to update local state for styling
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [selectableItems]);
 
   // Register numeric shortcuts for voucher types (priority 20, above global)
   useEffect(() => {
-    return registerKeyHandler(20, (event, keyString, isTyping) => {
-      if (isTyping) return false;
+    function handleKeyDown(event) {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+      const key = event.key.toLowerCase();
 
       // Numeric shortcuts 1-6 for quick voucher creation
       const quickTypes = {
@@ -82,35 +103,35 @@ export function GatewayMenu() {
         '5': 'PURCHASE',
         '6': 'CONTRA',
       };
-      if (quickTypes[keyString]) {
+      if (quickTypes[key]) {
         event.preventDefault();
         commandBus.dispatch(COMMANDS.VIEW_PUSH, {
           screen: SCREENS.VOUCHER_NEW,
-          params: { vtype: quickTypes[keyString] }
+          params: { vtype: quickTypes[key] }
         });
-        return true;
+        return;
       }
 
       // Alt+Hotkey for direct item navigation
       if (event.altKey) {
-        const key = event.key.toLowerCase();
         const match = selectableItems.find((item) => item.hotkey?.toLowerCase() === key);
         if (match) {
           event.preventDefault();
           navigateItem(match);
-          return true;
+          return;
         }
       }
 
       // N for new voucher
-      if (keyString === 'n') {
+      if (key === 'n') {
         event.preventDefault();
         commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_NEW });
-        return true;
+        return;
       }
+    }
 
-      return false;
-    });
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectableItems]);
 
   // Dashboard summary (minimal, one-line, no cards)
@@ -141,8 +162,8 @@ export function GatewayMenu() {
     return (
       <tr
         key={entry.id}
-        data-focus-index={idx}
-        className={isActive ? 'tally-row-active' : ''}
+        id={`gateway-item-${idx}`}
+        className={isActive ? 'tally-row-active focusable border-none' : 'focusable border-none'}
         onClick={() => navigateItem(entry)}
       >
         <td className="px-2 py-0.5 text-sm">{entry.label}</td>
@@ -159,7 +180,7 @@ export function GatewayMenu() {
       <div className="tally-panel-header">Gateway of Tally</div>
 
       {/* Menu list */}
-      <div {...containerProps} style={{ outline: 'none' }}>
+      <div className="w-full">
         <table className="w-full text-sm">
           <tbody>
             {displayRows}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useViewState, SCREENS } from '../providers/ViewStateProvider';
 import { useAuth } from '../auth/AuthContext';
-import { matchesBinding, registerKeyHandler, MOD_LABEL, isMac } from '../lib/KeyboardManager';
+import { commandBus, COMMANDS } from '../core/CommandBus';
 import { CommandPalette } from '../components/CommandPalette';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { ResetConfirmModal } from '../components/ResetConfirmModal';
@@ -18,6 +18,8 @@ import { TrialBalancePanel, ProfitLossPanel, BalanceSheetPanel } from '../featur
 import { UsersPanel } from '../features/users/UsersPanel';
 import { ChangePasswordPanel } from '../features/users/ChangePasswordPanel';
 import { CompanySetupPanel } from '../features/company/CompanySetupPanel';
+
+const isMac = navigator.userAgent.includes('Mac');
 
 /** Helper: shows key combos for both platforms */
 function KeyLabel({ mac, win }) {
@@ -48,50 +50,36 @@ export function TallyShell() {
         })
         : '—';
 
-    // Register global keyboard handler (priority 10 = lowest, global level)
+    // Register CommandBus listeners for System Commands
     useEffect(() => {
-        return registerKeyHandler(10, (event, keyString, isTyping) => {
-            // Don't handle if a modal is open
-            if (paletteOpen || datePickerOpen || resetModalOpen) return false;
-
-            if (matchesBinding(keyString, 'commandPalette')) {
-                event.preventDefault();
-                setPaletteOpen(true);
-                return true;
-            }
-            if (matchesBinding(keyString, 'company')) {
-                event.preventDefault();
-                pushScreen(SCREENS.COMPANY_SETUP);
-                return true;
-            }
-            if (matchesBinding(keyString, 'changeDate')) {
-                event.preventDefault();
-                setDatePickerOpen(true);
-                return true;
-            }
-            if (matchesBinding(keyString, 'configure')) {
-                event.preventDefault();
-                return true;
-            }
-            if (matchesBinding(keyString, 'resetCompany')) {
-                event.preventDefault();
-                setResetModalOpen(true);
-                return true;
-            }
-            if (matchesBinding(keyString, 'print')) {
-                event.preventDefault();
-                window.dispatchEvent(new CustomEvent('open-print-preview'));
-                return true;
-            }
-            // Global back — only if not typing
-            if (!isTyping && matchesBinding(keyString, 'backAlt')) {
-                event.preventDefault();
-                popScreen();
-                return true;
-            }
-            return false;
+        const unsubPalette = commandBus.subscribe(COMMANDS.OPEN_CONFIG, () => {
+            if (!paletteOpen && !datePickerOpen && !resetModalOpen) setPaletteOpen(true);
         });
-    }, [paletteOpen, datePickerOpen, resetModalOpen, pushScreen, popScreen]);
+
+        const unsubReset = commandBus.subscribe(COMMANDS.RESET_COMPANY, () => {
+            if (!paletteOpen && !datePickerOpen && !resetModalOpen) setResetModalOpen(true);
+        });
+
+        const unsubPrint = commandBus.subscribe(COMMANDS.PRINT, () => {
+            if (!paletteOpen && !datePickerOpen && !resetModalOpen) {
+                window.dispatchEvent(new CustomEvent('open-print-preview'));
+            }
+        });
+
+        const unsubViewPop = commandBus.subscribe(COMMANDS.VIEW_POP, () => {
+            // VIEW_POP is global back, only pop if we aren't handling it locally in a modal
+            if (!paletteOpen && !datePickerOpen && !resetModalOpen) {
+                popScreen();
+            }
+        });
+
+        return () => {
+            unsubPalette();
+            unsubReset();
+            unsubPrint();
+            unsubViewPop();
+        };
+    }, [paletteOpen, datePickerOpen, resetModalOpen, popScreen]);
 
     // Build command catalog for palette
     const commands = getCommandCatalog(canManageUsers).map((cmd) => ({

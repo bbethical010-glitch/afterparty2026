@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
-import { useFocusList, useAutoFocus } from '../../lib/FocusManager';
+import { commandBus, COMMANDS } from '../../core/CommandBus';
+import { listEngine } from '../../core/ListEngine';
 
 function formatAmount(value) {
   return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -16,6 +17,8 @@ export function LedgerPanel() {
   const [accountId, setAccountId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts', businessId],
@@ -36,19 +39,36 @@ export function LedgerPanel() {
 
   const lines = data?.lines || [];
 
-  const { activeIndex, containerProps } = useFocusList(lines.length, {
-    onSelect: (idx) => {
-      if (lines[idx]?.voucherId) {
-        pushScreen(SCREENS.VOUCHER_EDIT, { voucherId: lines[idx].voucherId });
+  useEffect(() => {
+    const listMap = lines.map((line, idx) => ({
+      id: `ledger-item-${idx}`,
+      onSelect: () => {
+        if (line.voucherId) {
+          commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_EDIT, params: { voucherId: line.voucherId } });
+        }
       }
-    },
-    onBack: () => popScreen(),
-  });
+    }));
 
-  useAutoFocus(containerProps.ref);
+    listEngine.init(SCREENS.LEDGER_LIST, {
+      onBack: () => commandBus.dispatch(COMMANDS.VIEW_POP)
+    });
+    listEngine.registerItems(listMap);
+    listEngine.setCurrentIndex(activeIndex);
+
+    const originalFocus = listEngine._focusCurrent.bind(listEngine);
+    listEngine._focusCurrent = () => {
+      originalFocus();
+      setActiveIndex(listEngine.currentIndex);
+    };
+
+    return () => listEngine.destroy();
+  }, [lines, activeIndex]);
 
   function onFilterKeyDown(e) {
-    if (e.key === 'Escape') { e.preventDefault(); containerProps.ref.current?.focus(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      document.getElementById(`ledger-item-${activeIndex}`)?.focus();
+    }
   }
 
   return (
@@ -71,7 +91,7 @@ export function LedgerPanel() {
         </div>
       )}
 
-      <div {...containerProps} className="max-h-[calc(100vh-200px)] overflow-auto">
+      <div className="max-h-[calc(100vh-200px)] overflow-auto">
         <table className="w-full table-grid text-sm">
           <thead className="tally-table-header">
             <tr><th>Date</th><th>Voucher</th><th>Status</th><th>Type</th><th>Amount</th><th>Running Bal.</th></tr>
@@ -80,9 +100,9 @@ export function LedgerPanel() {
             {lines.map((line, idx) => (
               <tr
                 key={idx}
-                data-focus-index={idx}
+                id={`ledger-item-${idx}`}
                 className={idx === activeIndex ? 'tally-row-active' : ''}
-                onClick={() => line.voucherId && pushScreen(SCREENS.VOUCHER_EDIT, { voucherId: line.voucherId })}
+                onClick={() => line.voucherId && commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.VOUCHER_EDIT, params: { voucherId: line.voucherId } })}
               >
                 <td>{new Date(line.txnDate).toLocaleDateString('en-IN')}</td>
                 <td>{line.voucherNumber}</td>

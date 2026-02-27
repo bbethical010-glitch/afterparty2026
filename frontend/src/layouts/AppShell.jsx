@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
-import { useGlobalShortcuts } from '../hooks/useGlobalShortcuts';
+
 import { CommandPalette } from '../components/CommandPalette';
 import { DatePickerModal } from '../components/DatePickerModal';
 import { getCommandCatalog } from '../lib/navigation';
@@ -58,26 +58,7 @@ export function AppShell() {
     navigate(path);
   }
 
-  useGlobalShortcuts({
-    disabled: isPaletteOpen || isDatePickerOpen,
-    onCreate: () => navigate('/vouchers/new'),
-    onBack: () => navigate('/gateway'),
-    onGateway: () => navigate('/gateway'),
-    onMasters: () => navigate('/ledger'),
-    onTransactions: () => navigate('/vouchers'),
-    onUsers: canManageUsers ? () => navigate('/users') : undefined,
-    onPassword: () => navigate('/change-password'),
-    onGoTo: () => setIsPaletteOpen(true),
-    // New handlers
-    onCompany: () => navigate('/company-setup'),
-    onChangeDate: () => setIsDatePickerOpen(true),
-    onConfigure: () => {
-      window.dispatchEvent(new CustomEvent('open-config'));
-    },
-    onPrint: () => {
-      window.dispatchEvent(new CustomEvent('open-print-preview'));
-    }
-  });
+  // Global shortcuts have been removed in favor of FocusGraph and ListEngine
 
   useEffect(() => {
     if (isPaletteOpen || isDatePickerOpen) return;
