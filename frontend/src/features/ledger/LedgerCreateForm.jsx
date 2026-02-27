@@ -4,8 +4,8 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../auth/AuthContext';
 import { GroupSelector } from '../../components/GroupSelector';
 import { announceToScreenReader } from '../../hooks/useFocusUtilities';
-import { useViewState, SCREENS } from '../../providers/ViewStateProvider';
-import { useEnterToAdvance } from '../../hooks/useEnterToAdvance';
+import { useViewState } from '../../providers/ViewStateProvider';
+import { focusGraph } from '../../core/FocusGraph';
 
 /**
  * LedgerCreateForm — Tally-style ledger creation form.
@@ -28,14 +28,40 @@ export function LedgerCreateForm() {
     const [openingBalanceType, setOpeningBalanceType] = useState('DR');
     const [error, setError] = useState('');
 
-    const nameRef = useRef(null);
-    const formRef = useRef(null);
 
-    useEnterToAdvance(formRef, {
-        onFinalEnter: () => {
-            handleSubmit();
-        }
-    });
+
+    // Phase M: Register strict FocusGraph nodes
+    useEffect(() => {
+        focusGraph.init('ledger-create');
+
+        focusGraph.registerNode('ledgerName', {
+            next: () => {
+                if (!name.trim()) {
+                    setError('Ledger name is required');
+                    return 'ledgerName'; // Stay here
+                }
+                setError('');
+                return 'groupCode';
+            },
+            prev: null
+        });
+        focusGraph.registerNode('groupCode', { next: 'openingBalance', prev: 'ledgerName' });
+        focusGraph.registerNode('openingBalance', { next: 'openingBalanceType', prev: 'groupCode' });
+        focusGraph.registerNode('openingBalanceType', {
+            next: () => {
+                handleSubmit();
+                return null; // Stop focus traversal, submission handles the rest
+            },
+            prev: 'openingBalance'
+        });
+
+        // Set initial focus
+        focusGraph.setCurrentNode('ledgerName');
+
+        return () => {
+            focusGraph.destroy();
+        };
+    }, [name]);
 
     // Fetch the real account_groups from the backend so we can resolve code → id
     const { data: groups = [] } = useQuery({
@@ -85,15 +111,17 @@ export function LedgerCreateForm() {
     function validate() {
         if (!name.trim()) {
             setError('Ledger name is required');
-            nameRef.current?.focus();
+            focusGraph.setCurrentNode('ledgerName');
             return false;
         }
         if (!groupCode) {
             setError('Please select a group under');
+            focusGraph.setCurrentNode('groupCode');
             return false;
         }
         if (!groupId) {
             setError('Group not found in system — try refreshing');
+            focusGraph.setCurrentNode('groupCode');
             return false;
         }
         return true;
@@ -105,28 +133,19 @@ export function LedgerCreateForm() {
         if (validate()) saveMutation.mutate();
     }
 
-    function handleFormKeyDown(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            e.preventDefault();
-            handleSubmit();
-        }
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            popScreen();
-        }
-    }
+    // In Phase M, general commands (Ctrl+Enter, Esc, Enter) are handled by the 
+    // global CommandBus and InputEngine. We don't need local overrides here anymore
+    // except possibly for specific edge cases, but for strict adherence, we remove them.
 
-    // Auto-focus name field on mount
-    useEffect(() => {
-        nameRef.current?.focus();
-    }, []);
+    // Removed auto-focus effect in favor of FocusGraph.setCurrentNode()
+    // useEffect(() => {
+    //     nameRef.current?.focus();
+    // }, []);
 
     return (
         <form
-            ref={formRef}
             className="tally-panel"
             onSubmit={handleSubmit}
-            onKeyDown={handleFormKeyDown}
             aria-label="Create Ledger"
         >
             {/* Header */}
@@ -142,7 +161,7 @@ export function LedgerCreateForm() {
                         <span className="hotkey">N</span>ame
                     </span>
                     <input
-                        ref={nameRef}
+                        id="ledgerName"
                         className="focusable border border-tally-panelBorder bg-white p-1"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
@@ -157,7 +176,11 @@ export function LedgerCreateForm() {
                     <span>
                         <span className="hotkey">U</span>nder (Group)
                     </span>
-                    <GroupSelector value={groupCode} onChange={onGroupChange} />
+                    <GroupSelector
+                        id="groupCode"
+                        value={groupCode}
+                        onChange={onGroupChange}
+                    />
                     <div className="text-[11px] opacity-60">
                         Arrow ↑↓ to navigate · Enter to select · Type to filter
                     </div>
@@ -170,6 +193,7 @@ export function LedgerCreateForm() {
                     </span>
                     <div className="flex gap-2">
                         <input
+                            id="openingBalance"
                             type="number"
                             min="0"
                             step="0.01"
@@ -179,6 +203,7 @@ export function LedgerCreateForm() {
                             placeholder="0.00"
                         />
                         <select
+                            id="openingBalanceType"
                             className="focusable border border-tally-panelBorder bg-white p-1"
                             value={openingBalanceType}
                             onChange={(e) => setOpeningBalanceType(e.target.value)}
@@ -219,7 +244,7 @@ export function LedgerCreateForm() {
             </div>
 
             <div className="tally-status-bar">
-                Tab fields · Ctrl+Enter Accept · Esc Back
+                Enter moves field · Ctrl+Enter Accept · Esc Back
             </div>
         </form>
     );

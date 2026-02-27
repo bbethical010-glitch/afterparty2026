@@ -14,7 +14,7 @@ import { TALLY_GROUP_HIERARCHY } from '../lib/constants';
  *   Esc           — close without selecting
  *   Typing        — filter groups by name
  */
-export function GroupSelector({ value, onChange, disabled = false }) {
+export function GroupSelector({ id, value, onChange, disabled = false }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [focusedIdx, setFocusedIdx] = useState(0);
@@ -119,6 +119,7 @@ export function GroupSelector({ value, onChange, disabled = false }) {
         <div className="group-selector-root relative">
             {/* Trigger button */}
             <button
+                id={id}
                 ref={triggerRef}
                 type="button"
                 disabled={disabled}
