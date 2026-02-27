@@ -75,7 +75,7 @@ export function LedgerPanel() {
     <section className="tally-panel">
       <div className="tally-panel-header">Ledger</div>
       <div className="p-1 grid gap-1 md:grid-cols-4 text-xs" onKeyDown={onFilterKeyDown}>
-        <select className="tally-input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+        <select autoFocus className="tally-input focusable" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
           <option value="">Select ledger</option>
           {accounts.map((account) => (
             <option key={account.id} value={account.id}>{account.code} - {account.name}</option>

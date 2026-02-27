@@ -46,8 +46,15 @@ export function UsersPanel() {
     return () => listEngine.destroy();
   }, [users]);
 
+  function handleKeyDown(e) {
+    if (e.key.toLowerCase() === 'c' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen: SCREENS.USER_CREATE });
+    }
+  }
+
   return (
-    <section className="tally-panel">
+    <section className="tally-panel" onKeyDown={handleKeyDown}>
       <div className="tally-panel-header">Users</div>
       <div>
         <table className="w-full table-grid text-sm">
@@ -72,7 +79,10 @@ export function UsersPanel() {
           </tbody>
         </table>
       </div>
-      <div className="tally-status-bar">↑↓ Navigate · Esc Back</div>
+      <div className="tally-status-bar flex justify-between">
+        <span>↑↓ Navigate · Esc Back</span>
+        <span><kbd>C</kbd> Create User</span>
+      </div>
     </section>
   );
 }

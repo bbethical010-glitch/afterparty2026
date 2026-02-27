@@ -56,10 +56,15 @@ export function GatewayMenu() {
   };
 
   function navigateItem(item) {
-    const screen = pathToScreen[item.path];
+    const [pathObj, query] = item.path.split('?');
+    const screen = pathToScreen[pathObj];
     if (screen) {
+      const params = {};
+      if (query) {
+        new URLSearchParams(query).forEach((v, k) => params[k] = v);
+      }
       // Persist focus state in viewStack
-      commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen, focusIndex: activeIndex });
+      commandBus.dispatch(COMMANDS.VIEW_PUSH, { screen, params, focusIndex: activeIndex });
     }
   }
 

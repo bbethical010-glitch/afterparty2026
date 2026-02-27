@@ -30,13 +30,19 @@ export function LedgerCreateForm() {
 
 
 
+    const stateRef = useRef({ name, handleSubmit: (e) => handleSubmit(e) });
+    // Keep ref updated with latest state & functions without triggering effect
+    useEffect(() => {
+        stateRef.current = { name, handleSubmit: (e) => handleSubmit(e) };
+    });
+
     // Phase M: Register strict FocusGraph nodes
     useEffect(() => {
         focusGraph.init('ledger-create');
 
         focusGraph.registerNode('ledgerName', {
             next: () => {
-                if (!name.trim()) {
+                if (!stateRef.current.name.trim()) {
                     setError('Ledger name is required');
                     return 'ledgerName'; // Stay here
                 }
@@ -49,19 +55,19 @@ export function LedgerCreateForm() {
         focusGraph.registerNode('openingBalance', { next: 'openingBalanceType', prev: 'groupCode' });
         focusGraph.registerNode('openingBalanceType', {
             next: () => {
-                handleSubmit();
+                stateRef.current.handleSubmit();
                 return null; // Stop focus traversal, submission handles the rest
             },
             prev: 'openingBalance'
         });
 
         // Set initial focus
-        focusGraph.setCurrentNode('ledgerName');
+        setTimeout(() => focusGraph.setCurrentNode('ledgerName'), 50);
 
         return () => {
             focusGraph.destroy();
         };
-    }, [name]);
+    }, []);
 
     // Fetch the real account_groups from the backend so we can resolve code → id
     const { data: groups = [] } = useQuery({

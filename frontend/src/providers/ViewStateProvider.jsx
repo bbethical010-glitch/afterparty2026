@@ -27,6 +27,7 @@ export const SCREENS = {
     PROFIT_LOSS: 'profit-loss',
     BALANCE_SHEET: 'balance-sheet',
     USERS: 'users',
+    USER_CREATE: 'user-create',
     CHANGE_PASSWORD: 'change-password',
     COMPANY_SETUP: 'company-setup',
     RESET_COMPANY: 'reset-company',

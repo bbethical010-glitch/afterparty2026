@@ -23,6 +23,11 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
 
     const companyName = business?.name || user?.businessName || 'Company';
 
+    const stateRef = useRef({ confirmText: '', companyName: '' });
+    useEffect(() => {
+        stateRef.current = { confirmText, companyName };
+    });
+
     useEffect(() => {
         if (open) {
             setConfirmText('');
@@ -30,7 +35,7 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
             focusGraph.registerNode('resetInput', {
                 next: () => {
                     // Enter to submit
-                    if (confirmText === companyName) {
+                    if (stateRef.current.confirmText === stateRef.current.companyName) {
                         resetMutation.mutate();
                     }
                     return null;
@@ -41,7 +46,7 @@ export function ResetConfirmModal({ open, onClose, onReset }) {
         } else {
             focusGraph.destroy();
         }
-    }, [open, confirmText, companyName]);
+    }, [open]);
 
     const resetMutation = useMutation({
         mutationFn: () => api.post('/reset-company', { confirmationName: confirmText }),
