@@ -315,7 +315,7 @@ EXECUTE FUNCTION fn_validate_transaction_balance();
 -- (:business_id, 'Liabilities',    'LI', 'LIABILITY',     NULL, TRUE),
 -- (:business_id, 'Income',         'IN', 'INCOME',        NULL, TRUE),
 -- (:business_id, 'Expenses',       'EX', 'EXPENSE',       NULL, TRUE),
--- (:business_id, 'Capital',        'EQ', 'EQUITY',        NULL, TRUE);
+-- (:business_id, 'Capital Account',        'EQ', 'EQUITY',        NULL, TRUE);
 
 CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
